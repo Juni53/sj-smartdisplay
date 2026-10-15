@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>プライバシーポリシー - Smart Display</title>
+<meta name="description" content="Smart Display のプライバシーポリシー">
+<style>
+:root{--bg:#161616;--panel:#1f1f1f;--line:#3a3a3a;--fg:#ececec;--dim:#9a9a9a}
+*{box-sizing:border-box;border-radius:0}
+html{background:var(--bg);color:var(--fg)}
+body{margin:0;font:16px/1.8 "Noto Sans JP","Hiragino Sans","Yu Gothic",system-ui,sans-serif}
+main{max-width:760px;margin:0 auto;padding:32px 16px 64px}
+h1{font-weight:500;font-size:28px;letter-spacing:.04em;margin:0 0 4px}
+h2{font-weight:500;font-size:19px;margin:40px 0 8px;padding-top:12px;border-top:1px solid var(--line)}
+p,li{color:#d6d6d6}
+small,.dim{color:var(--dim)}
+a{color:var(--fg);text-underline-offset:3px}
+nav{display:flex;gap:16px;flex-wrap:wrap;margin:16px 0 8px;font-size:14px}
+code{background:var(--panel);border:1px solid var(--line);padding:1px 6px;font-size:.9em}
+img{max-width:100%;height:auto;border:1px solid var(--line);display:block;margin:12px 0}
+table{border-collapse:collapse;width:100%;font-size:15px}
+th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+th{background:var(--panel);font-weight:500}
+.en{margin-top:48px;padding:16px;border:1px solid var(--line);background:var(--panel)}
+.en h2{border:0;margin-top:0;padding-top:0}
+</style>
+</head>
+<body><main>
+<h1>プライバシーポリシー</h1>
+<p class="dim">Smart Display ／ 制定日 2026年10月15日</p>
+<nav><a href="./">ホーム</a><a href="privacy.html">プライバシーポリシー</a><a href="terms.html">利用規約</a></nav>
+
+<p>Sokunun（以下「開発者」）は、Android アプリ「Smart Display」（以下「本アプリ」）における、利用者の情報の取り扱いを次のとおり定めます。</p>
+
+<h2>1. 取得する情報と利用目的</h2>
+<table>
+<tr><th>情報</th><th>取得の条件</th><th>利用目的</th></tr>
+<tr><td>Google カレンダーの予定（タイトル、開始・終了日時、終日かどうか）</td><td>利用者が Google の認証で許可した場合のみ（読み取り専用）</td><td>「概要」タブの一覧に表示する</td></tr>
+<tr><td>Google ToDo のタスク（タイトル、期日、完了状態）</td><td>同上</td><td>「概要」タブの一覧に表示する</td></tr>
+<tr><td>Google の認証情報（OAuth クライアントID・シークレット、リフレッシュトークン）</td><td>利用者自身が設定したもの</td><td>上記の取得のために、アクセストークンを取り直す</td></tr>
+<tr><td>SwitchBot のトークン・シークレット、デバイスID</td><td>利用者自身が入力したもの</td><td>エアコン・照明を操作する</td></tr>
+<tr><td>位置（緯度・経度）</td><td>利用者が設定画面に入力した値（端末の位置情報機能は使いません）</td><td>天気予報を取得する</td></tr>
+<tr><td>パソコンの状態（CPU・メモリ・GPU・通信量、再生中の曲名）</td><td>利用者が自分のパソコンで PC 側プログラムを起動した場合のみ</td><td>「PC」タブと待機画面に表示する</td></tr>
+</table>
+
+<h2>2. 情報の保存場所</h2>
+<ul>
+<li>上記の情報は、<b>利用者のスマートフォン内</b>（本アプリ専用の保存領域。バックアップの対象外）にのみ保存されます。</li>
+<li>Google の認証情報は、利用者のパソコン上の設定ファイル（<code>google_config.json</code>）にも、設定の取り込みが終わるまで保存されます。取り込み後は削除できます。</li>
+<li>取得した予定・ToDoは、画面に表示するためにアプリの動作中のメモリにだけ置き、アプリ内に長期保存しません。</li>
+</ul>
+
+<h2>3. 第三者への提供・共有</h2>
+<p>開発者は、本アプリで扱う情報を、開発者のサーバーを含むいかなる外部にも送信しません。開発者は利用者の情報を取得できません。
+情報の販売、広告への利用、人による閲覧、AI・機械学習モデルの学習への利用は行いません。</p>
+<p>本アプリは、機能のために次の外部サービスと、利用者の端末から直接通信します。</p>
+<ul>
+<li>Google（<code>oauth2.googleapis.com</code>、Google Calendar API、Google Tasks API）: 予定・ToDoの取得</li>
+<li>SwitchBot API: エアコン・照明の操作</li>
+<li>Open-Meteo（<code>api.open-meteo.com</code>）: 天気予報の取得（緯度・経度を送信します）</li>
+</ul>
+
+<h2>4. Google ユーザーデータの取り扱い（Limited Use）</h2>
+<p>本アプリによる Google API から受け取った情報の使用および他のアプリへの転送は、
+<a href="https://developers.google.com/terms/api-services-user-data-policy">Google API サービスのユーザーデータに関するポリシー</a>
+（Limited Use の要件を含む）に準拠します。取得するデータは、利用者に見える機能（概要タブの表示）の提供のためにだけ使います。</p>
+
+<h2>5. 情報の削除・許可の取り消し</h2>
+<ul>
+<li>Google へのアクセス許可は、いつでも <a href="https://myaccount.google.com/permissions">Google アカウントの「サードパーティによるアクセス」</a>から取り消せます。</li>
+<li>本アプリを削除するか、端末の「アプリ情報 → ストレージ → データを削除」を行うと、スマートフォン内のすべての設定・認証情報が消えます。</li>
+<li>パソコン上の <code>google_config.json</code> は、利用者自身で削除してください。</li>
+</ul>
+
+<h2>6. セキュリティ</h2>
+<p>認証情報は本アプリ専用の領域に保存し、画面（表示部分）のプログラムには渡しません。本アプリの画面は、同梱のファイル以外の外部サイトへは接続できません。
+Google・SwitchBot・Open-Meteo との通信は暗号化（HTTPS）されます。</p>
+
+<h2>7. 子どもの情報</h2>
+<p>本アプリは、子どもを対象としたものではありません。</p>
+
+<h2>8. 変更</h2>
+<p>本ポリシーを変更するときは、このページを更新し、制定日の下に改定日を記載します。</p>
+
+<h2>9. お問い合わせ</h2>
+<p>Sokunun ／ <a href="mailto:taroujun53@gmail.com">taroujun53@gmail.com</a></p>
+
+<div class="en">
+<h2>Privacy Policy (English summary)</h2>
+<p>Smart Display reads, only with your explicit consent and in read-only mode, your Google Calendar events and Google Tasks to display them in the app's Overview tab. All data stays on your phone (app-private storage); the developer operates no server and cannot access your data. Data is not sold, shared, used for advertising, read by humans, or used to train AI/ML models. Use of information received from Google APIs adheres to the
+<a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>, including the Limited Use requirements.
+You can revoke access at any time at <a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a>, and delete all local data by uninstalling the app or clearing its storage. Contact: <a href="mailto:taroujun53@gmail.com">taroujun53@gmail.com</a></p>
+</div>
+<p class="dim">制定日: 2026年10月15日</p>
+</main></body></html>

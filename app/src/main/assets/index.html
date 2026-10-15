@@ -1,0 +1,1715 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Smart Display</title>
+<style>
+@font-face{font-family:"Rajdhani";font-weight:300;src:url(fonts/rajdhani-latin-300-normal.woff2) format("woff2")}
+@font-face{font-family:"Rajdhani";font-weight:500;src:url(fonts/rajdhani-latin-500-normal.woff2) format("woff2")}
+@font-face{font-family:"Share Tech Mono";font-weight:400;src:url(fonts/share-tech-mono-latin-400-normal.woff2) format("woff2")}
+
+:root{
+  --bg:#161616; --panel:#1f1f1f; --btn:#242424; --line:#3a3a3a; --line2:#4a4a4a;
+  --fg:#ececec; --dim:#9a9a9a;
+  --jp:"Noto Sans JP","Noto Sans CJK JP",sans-serif;
+  --num:Rajdhani,"Noto Sans JP","Noto Sans CJK JP",sans-serif;
+  --mono:"Share Tech Mono","Noto Sans JP","Noto Sans CJK JP",monospace;
+}
+*{box-sizing:border-box;border-radius:0;box-shadow:none;-webkit-tap-highlight-color:transparent}
+[hidden]{display:none!important}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--fg);font-family:var(--jp);
+  -webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+
+/* 740x360 の舞台を画面いっぱいに拡縮して中央に置く（S8の横向きは約740x360dp） */
+#stage{position:absolute;left:0;top:0;width:740px;height:360px;display:flex;transform-origin:0 0}
+
+.lbl{font:400 10px var(--mono);letter-spacing:.2em;color:var(--dim)}
+.b{min-height:44px;min-width:44px;background:var(--btn);border:1px solid var(--line2);color:#d6d6d6;
+  font:500 13px var(--jp);letter-spacing:.06em;padding:0 4px;cursor:pointer;touch-action:manipulation}
+.b:active,.b.press{background:#3c3c3c}
+.b.on{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.b:disabled{opacity:.35;pointer-events:none}
+.b:focus-visible{outline:2px solid #fff;outline-offset:2px}
+
+/* ---- 左: 時計 ---- */
+#left{width:250px;height:100%;padding:16px 18px;background:var(--panel);border-right:1px solid var(--line);
+  display:flex;flex-direction:column;justify-content:space-between}
+.lhead{display:flex;justify-content:space-between;align-items:flex-start}
+.lhead .d1{font:500 14px var(--jp);letter-spacing:.08em;margin-top:4px}
+.lhead .r{text-align:right;line-height:1.5}
+#clock{width:168px;height:168px;align-self:center;display:block}
+.digital{display:flex;align-items:baseline;justify-content:space-between}
+#hhmm{font:300 60px/1 var(--num);letter-spacing:.02em;font-variant-numeric:tabular-nums}
+#ss{font:400 20px/1 var(--mono);color:var(--dim)}
+
+/* ---- 右: タブ + スワイプカード ---- */
+#right{flex:1;min-width:0;height:100%;padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+#tabs{display:grid;grid-template-columns:repeat(5,minmax(0,1fr)) 44px 44px;gap:2px;flex:none}
+#tabs .tab{letter-spacing:0;white-space:nowrap}
+#tabs .b{padding:0 2px}
+#vp{position:relative;flex:1;min-height:0;overflow:hidden;touch-action:pan-y}
+#track{display:flex;width:500%;height:100%;transition:transform .3s cubic-bezier(.2,.7,.2,1)}
+.page{flex:0 0 20%;width:20%;min-width:0;height:100%}
+.card{height:100%;padding:12px 14px;border:1px solid var(--line);background:var(--panel);
+  display:flex;flex-direction:column;justify-content:space-between}
+.hd{display:flex;justify-content:space-between;align-items:center;height:18px;font-size:12px;white-space:nowrap}
+.hd b{font-weight:500;margin-left:8px}
+.sum{display:flex;align-items:center;font-size:12px;color:var(--fg)}
+.dot{display:inline-block;width:8px;height:8px;margin-right:8px;border:1px solid var(--dim)}
+.dot.on{background:var(--fg);border-color:var(--fg)}
+.dot.off{background:var(--dim)}
+
+.seg{flex:1;min-width:0;display:grid;gap:2px;grid-template-columns:repeat(var(--n),minmax(0,1fr))}
+.seg.n4{--n:4}.seg.n6{--n:6}
+.line{display:flex;align-items:center;gap:10px;height:44px}
+.line .k{width:36px;flex:none}
+
+/* エアコン */
+.trow{display:flex;align-items:center;gap:16px;height:64px}
+.tval{width:128px;flex:none;display:flex;flex-direction:column;gap:2px}
+.big{font:500 46px/1 var(--num);font-variant-numeric:tabular-nums}
+.big small{font-size:16px;color:var(--dim);margin-left:3px}
+.sl{flex:1;min-width:0}
+.ticks{display:flex;justify-content:space-between;margin-top:-4px;padding:0 2px}
+.rng{-webkit-appearance:none;appearance:none;display:block;width:100%;height:44px;margin:0;cursor:pointer;touch-action:none;
+  background:linear-gradient(to right,var(--fg) var(--p,50%),var(--line2) var(--p,50%)) no-repeat 0 50%/100% 4px}
+.rng::-webkit-slider-runnable-track{height:44px;background:transparent}
+.rng::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:16px;height:32px;margin-top:6px;background:var(--fg);border:0}
+.rng:focus-visible{outline:2px solid #fff;outline-offset:2px}
+.acts{display:grid;grid-template-columns:72px 72px 1fr;gap:2px;height:44px}
+.send{letter-spacing:.14em}
+.send:not(:disabled){border:2px solid var(--fg);color:var(--fg);font-weight:700}
+
+/* 照明 */
+.bright{display:grid;grid-template-columns:1fr 1fr;gap:2px;height:140px}
+.bright .b{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px}
+.sign{font:300 54px/1 var(--num)}
+.hint{font:400 10px var(--jp);color:var(--dim);letter-spacing:.1em}
+#lights .b{min-height:56px;font-size:14px}
+
+/* タイマー */
+.disp{height:84px;border:1px solid var(--line2);background:var(--bg);display:flex;align-items:center;justify-content:center;
+  font:300 66px/1 var(--num);letter-spacing:.04em;font-variant-numeric:tabular-nums}
+.disp.idle{color:var(--dim)}
+.disp.on{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.trow2{display:flex;gap:2px;align-items:stretch}
+.trow2 .step{width:60px;flex:none}
+.trow2 .step.gap{margin-right:12px}
+.acts2{display:grid;grid-template-columns:1fr 120px;gap:2px;height:52px}
+.acts2 .b{min-height:52px;letter-spacing:.14em}
+@keyframes blink{0%,49%{background:var(--fg);color:var(--bg)}50%,100%{background:var(--btn);color:#d6d6d6}}
+.tab.alert{animation:blink 1s steps(1) infinite}
+
+/* 結果の通知（カード上部の見出し行に重ねる） */
+#toast{position:absolute;left:8px;right:8px;top:6px;height:28px;display:flex;align-items:center;padding:0 10px;
+  font:500 12px var(--jp);pointer-events:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;z-index:5}
+#toast.ok{background:var(--fg);color:var(--bg)}
+#toast.err{background:var(--bg);color:var(--fg);border:1px solid var(--fg)}
+
+
+/* ---- 部屋（エアコン ⇄ 照明 を縦スワイプ） / 入タイマー ---- */
+.b.armed{position:relative}
+.b.armed::after{content:"";position:absolute;right:0;top:0;border-style:solid;border-width:0 14px 14px 0;border-color:transparent var(--fg) transparent transparent}
+#tabs .b.armed::after{border-width:0 10px 10px 0}
+#tabs .b.on.armed::after{border-color:transparent var(--bg) transparent transparent}
+.vroom{position:relative;height:100%;overflow:hidden;touch-action:none}
+.vtrack{height:200%;display:flex;flex-direction:column;transition:transform .3s cubic-bezier(.2,.7,.2,1)}
+.vpage{height:50%;flex:none;min-height:0}
+.vdots{position:absolute;right:5px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:6px;z-index:3;pointer-events:none}
+.vdots i{display:block;width:5px;height:5px;border:1px solid var(--dim)}
+.vdots i.on{background:var(--fg);border-color:var(--fg)}
+.acts.t4{grid-template-columns:60px 60px 92px 1fr}
+.b .sub{display:block;font:400 9px var(--mono);letter-spacing:.08em;color:var(--dim);margin-top:1px}
+.b.tm{line-height:1.15}
+.otw{flex:1;display:flex;gap:14px;margin-top:8px;min-height:0}
+.otl{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px}
+.otprev{border:1px solid var(--line);background:var(--bg);padding:7px 10px;display:flex;flex-direction:column;gap:3px}
+.otprev .row{display:flex;align-items:baseline;justify-content:space-between}
+.otprev .pt{font:300 30px/1 var(--num);font-variant-numeric:tabular-nums;color:#b4b4b4}
+.otprev .pt small{font-size:14px}
+.otprev .ps{font-size:14px;color:#b4b4b4}
+.otprev .lbl{display:flex;justify-content:space-between;white-space:nowrap}
+.otin{border:1px solid var(--fg);background:var(--bg);height:78px;display:flex;align-items:center;justify-content:center;gap:2px;font:300 56px/1 var(--num);font-variant-numeric:tabular-nums;position:relative}
+.otin .cap{position:absolute;left:8px;top:5px;font-size:9px}
+.otin .c{font-size:44px;margin:0 4px;color:var(--dim)}
+.otin .d{display:inline-block;width:28px;text-align:center}
+.otin .d.e{color:var(--line2);font-size:44px}
+.otin .d.cur{border-bottom:3px solid var(--fg)}
+.otrow{display:grid;grid-template-columns:1fr 56px 56px;gap:2px;height:46px}
+.otrow .b{min-height:46px}
+.otpad{width:196px;flex:none;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(4,1fr);gap:2px}
+.otpad .b{font:400 24px var(--num);min-height:0;padding:0}
+.otpad .b.f{font:500 13px var(--jp)}
+
+/* ---- 概要 ---- */
+.ov{flex:1;display:flex;gap:14px;margin-top:8px;min-height:0}
+.ovl{width:188px;flex:none;display:flex;flex-direction:column;gap:8px;min-height:0}
+.ovdt{display:flex;align-items:stretch;gap:10px;height:84px;flex:none}
+.ovdt .md{display:flex;flex-direction:column;justify-content:space-between}
+.ovdt .mo{font:400 12px var(--mono);letter-spacing:.14em;color:var(--dim)}
+.ovdt .dd{font:300 62px/0.9 var(--num);font-variant-numeric:tabular-nums}
+.ovdt .wd{flex:1;background:var(--fg);color:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1}
+.ovdt .wd b{font:500 40px/1 var(--jp)}
+.ovdt .wd span{font:400 10px var(--mono);letter-spacing:.2em;margin-top:5px}
+.ovrain{flex:1;min-height:0;display:flex;flex-direction:column}
+.ovrain .rh{display:flex;justify-content:space-between}
+.ovrain svg{flex:1;min-height:0;width:100%;display:block}
+.ovr{flex:1;min-width:0;display:flex;flex-direction:column;min-height:0}
+.ovlh{display:flex;justify-content:space-between;align-items:center;height:22px;border-bottom:1px solid var(--line2);flex:none}
+.ovlh b{font:500 12px var(--jp);white-space:nowrap}
+.ovhl{font:500 15px var(--num);display:flex;align-items:baseline;gap:3px}
+.ovhl em{font:400 9px var(--mono);font-style:normal;color:var(--dim);margin:0 2px 0 6px}
+.ovlw{flex:1;min-height:0;position:relative}
+.ovls{position:absolute;left:0;right:8px;top:0;bottom:0;overflow-y:auto;touch-action:pan-y;scrollbar-width:none}
+.ovls::-webkit-scrollbar{display:none}
+.ovlw .sb{position:absolute;right:0;top:0;bottom:0;width:3px;background:var(--line)}
+.ovlw .sb i{position:absolute;left:0;right:0;top:0;height:50%;background:var(--dim)}
+.ovlw.fit .sb{display:none}
+.ovlw::after{content:"";position:absolute;left:0;right:8px;bottom:0;height:26px;pointer-events:none;opacity:0;transition:opacity .2s;background:linear-gradient(to bottom,rgba(31,31,31,0),var(--panel))}
+.ovlw.more::after{opacity:1}
+.ovit{display:grid;grid-template-columns:44px 14px 1fr;align-items:center;column-gap:6px;height:33px;border-bottom:1px solid var(--line);font-size:13px;white-space:nowrap;overflow:hidden}
+.ovit .t{font:400 13px var(--mono);color:#b4b4b4;letter-spacing:.04em}
+.ovit .g{width:10px;height:10px;border:1px solid var(--fg)}
+.ovit .g.ev{background:var(--fg)}
+.ovit .x{overflow:hidden;text-overflow:ellipsis}
+.ovit.todo .t{color:var(--dim)}
+.ovmsg{height:100%;display:flex;align-items:center;justify-content:center;text-align:center;padding:0 12px;font-size:12px;line-height:1.6;color:var(--dim)}
+.ovleg{display:flex;gap:12px;align-items:center;height:20px;flex:none;font:400 9px var(--mono);letter-spacing:.1em;color:var(--dim)}
+.ovleg i{display:inline-block;width:8px;height:8px;border:1px solid var(--fg);margin-right:4px}
+.ovleg i.ev{background:var(--fg)}
+
+/* ---- 待機画面: 黒背景に時計とエアコン概要。操作画面とは暗転・フェードでつなぐ ---- */
+html,body{transition:background-color .9s ease}
+html.idle,html.idle body{background:#000}
+#idle{position:absolute;left:0;top:0;right:0;bottom:0;background:#000;opacity:0;visibility:hidden;pointer-events:none;z-index:20;
+  transition:opacity .5s ease,visibility 0s .5s}
+html.idle #idle{opacity:1;visibility:visible;pointer-events:auto;transition:opacity .9s ease,visibility 0s}
+/* 位置の変更: ゆっくり消える → 見えない間に位置を変える → ゆっくり現れる */
+#idleBlock{position:absolute;left:50%;top:50%;display:flex;align-items:center;gap:28px;
+  transform:translate(-50%,-50%) translate(var(--jx,0px),var(--jy,0px));transition:transform 4s ease}
+#idle>div{transition:opacity .35s ease,transform 4s ease}
+#idle.swp>div{opacity:0}
+#iClock{width:150px;height:150px;flex:none;display:block}
+.itxt{width:300px;flex:none}
+#idleBlock .lbl{color:#858585}
+.ih{display:flex;justify-content:space-between}
+.it{display:flex;align-items:baseline;justify-content:space-between;margin-top:4px}
+#iTime{font:300 96px/1 var(--num);letter-spacing:.02em;color:#cfcfcf;font-variant-numeric:tabular-nums}
+#iSec{font:400 20px/1 var(--mono);color:#858585}
+.ir{height:1px;background:#2b2b2b;margin:12px 0 8px}
+.ia,.im{display:flex;align-items:center;justify-content:space-between;height:24px}
+#idleBlock .sum,.im .v{font-size:13px;color:#b4b4b4}
+#idleBlock .dot.on{background:#b4b4b4;border-color:#b4b4b4}
+.im .v{font:400 15px var(--mono);letter-spacing:.08em}
+
+/* 天気 */
+.wxnow{align-self:center;display:flex;align-items:center;gap:8px;height:30px;cursor:pointer}
+.wxnow svg{width:28px;height:28px;flex:none;display:block}
+#wxT{font:500 26px/1 var(--num);font-variant-numeric:tabular-nums}
+.wx-ico{--ibg:var(--panel)}
+.wx-ico .cl{fill:var(--ibg)}
+.wxbody{flex:1;min-height:0;display:flex;flex-direction:column;margin-top:6px}
+.wxcol,.wxr{display:grid;grid-template-columns:58px 40px repeat(4,minmax(0,1fr));align-items:center;column-gap:4px}
+.wxcol{height:20px;flex:none;border-bottom:1px solid var(--line2);font:400 10px var(--mono);letter-spacing:.06em;color:var(--dim);white-space:nowrap}
+.wxcol span:nth-child(n+3),.wxr span:nth-child(n+3){text-align:right}
+.wxcol span:nth-child(2){text-align:center}
+#wxList{flex:1;min-height:0;overflow-y:auto;touch-action:pan-y;scrollbar-width:none;position:relative}
+#wxList::-webkit-scrollbar{display:none}
+.wxr{height:26px;padding:0 6px 0 4px;border-bottom:1px solid var(--line)}
+.wxr .tm{font:400 13px var(--mono);letter-spacing:.04em}
+.wxr .n{font:500 16px var(--num);font-variant-numeric:tabular-nums}
+.wxr svg{width:22px;height:22px;display:block;margin:0 auto}
+.wxr.past{color:var(--dim)}
+.wxr.cur{--ibg:var(--fg);background:var(--fg);color:var(--bg);border-bottom-color:var(--fg)}
+.wxday{height:20px;display:flex;align-items:center;padding-left:4px;font:400 10px var(--mono);letter-spacing:.2em;color:var(--dim);background:var(--bg);border-bottom:1px solid var(--line)}
+.wxempty{flex:1;display:flex;align-items:center;justify-content:center;text-align:center;padding:0 20px;font-size:13px;color:var(--dim);line-height:1.6}
+#wxMeta{letter-spacing:.06em;margin-right:12px}
+
+/* PC */
+.pcgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:2px;height:76px}
+.tile{border:1px solid var(--line2);background:var(--bg);padding:6px 10px 7px;display:flex;flex-direction:column;justify-content:space-between;min-width:0}
+.tile .lbl{line-height:12px;height:12px;white-space:nowrap}
+.tile .v{font:500 30px/1 var(--num);font-variant-numeric:tabular-nums;white-space:nowrap}
+.tile .v small{font-size:12px;color:var(--dim);margin-left:2px;font-weight:400}
+.tile .bar{height:4px;background:var(--line2)}
+.tile .bar i{display:block;height:100%;background:var(--fg)}
+.tile .sub{font:400 10px var(--mono);color:var(--dim);letter-spacing:.08em;white-space:nowrap}
+.np{position:relative;height:46px;border:1px solid var(--line2);background:var(--bg);display:flex;align-items:center;justify-content:space-between;gap:10px;padding:0 10px 3px;min-width:0}
+.np .t{font:500 14px var(--jp);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.np .t em{font-style:normal;color:var(--dim);font-weight:400;margin-left:10px;font-size:12px}
+.np .tm{font:400 11px var(--mono);color:var(--dim);flex:none;letter-spacing:.06em}
+.np .sk{position:absolute;left:0;right:0;bottom:0;height:30px;touch-action:none;cursor:pointer}
+.sk .skb{position:absolute;left:0;right:0;bottom:0;height:3px;background:var(--line2)}
+.sk .skb i{position:relative;display:block;height:100%;background:var(--fg)}
+.sk .skb i::after{content:'';position:absolute;right:-2px;bottom:0;width:4px;height:11px;background:var(--fg)}
+.sk.lock .skb i::after,.volbar.lock i::after{display:none}
+.sk.drag .skb{height:5px}
+.np.none .t{color:var(--dim);font-weight:400}
+.mrow{display:grid;grid-template-columns:1fr 1.5fr 1fr;gap:2px;height:44px}
+.mrow .b svg{display:block;margin:0 auto}
+.pcvol{display:flex;gap:2px;align-items:center;height:44px}
+.pcvol .k{width:36px;flex:none;margin-right:6px}
+.volbar{touch-action:none;cursor:pointer;position:relative;flex:1;height:44px;border:1px solid var(--line2);background:var(--bg);display:flex;align-items:center;justify-content:center;font:500 18px var(--num)}
+.volbar i{position:absolute;left:0;top:0;bottom:0;background:#333}
+.volbar i::after{content:'';position:absolute;right:0;top:0;bottom:0;width:3px;background:var(--fg)}
+.volbar span{position:relative}
+#cPc .vbtn{min-height:28px;min-width:0;height:28px;padding:0 10px;font:400 11px var(--mono);letter-spacing:.14em;margin-left:12px;position:relative}
+#cPc .vbtn::after{content:'';position:absolute;left:0;right:0;top:-8px;bottom:-8px}   /* 見た目は小さく、押せる範囲は44px確保 */
+#cPc .vis{display:none}
+#cPc.vm .hd{margin-bottom:8px}
+#cPc.vm>*:not(.hd):not(.vis){display:none}
+#cPc.vm .vis{display:flex;flex-direction:column;flex:1;min-height:0;gap:8px}
+.bars{flex:1;min-height:0;display:flex;align-items:stretch;gap:3px;border:1px solid var(--line2);background:var(--bg);padding:10px 10px 0}
+.bars i,.bars2 i{position:relative;flex:1;display:block}
+.bars s,.bars2 s{position:absolute;left:0;right:0;bottom:0;height:100%;transform-origin:50% 100%;transform:scaleY(.02);background:var(--fg);will-change:transform}
+.bars b,.bars2 b{position:absolute;left:0;right:0;bottom:0;height:2px;background:#ececec;display:none;will-change:transform}
+.bars2 s{background:#8a8a8a}
+.bars2 b{background:#cfcfcf}
+html.vpeak .bars b,html.vpeak .bars2 b{display:block}
+.vnp{display:flex;justify-content:space-between;align-items:center;height:22px;font:500 13px var(--jp);white-space:nowrap;gap:10px}
+.vnp .t{overflow:hidden;text-overflow:ellipsis;min-width:0}
+.vnp em,.np .t em{font-style:normal;color:var(--dim);font-weight:400;margin-left:10px;font-size:12px}
+.vnp .tm{font:400 11px var(--mono);color:var(--dim);flex:none}
+.card.off .tile .v{color:var(--dim)}
+.card.off .tile .bar i{width:0!important}
+
+/* 待機画面（PC接続時）: 情報表示 / ビジュアライザー。どちらも一定周期で数十pxずれる */
+#idlePc,#vidle,#vidle2{position:absolute;left:44px;top:44px;width:652px;height:272px;display:none}
+#idle.pcmode #idlePc{display:block}
+#idle.vmode #vidle{display:block}
+#idle.wmode #vidle2{display:block}
+#idle.pcmode #idleBlock,#idle.vmode #idleBlock,#idle.wmode #idleBlock{display:none}
+.pcw{width:100%;height:100%;display:flex;gap:28px;transform:translate(var(--jx,0px),var(--jy,0px));transition:transform 4s ease}
+#idle .wx-ico{--ibg:#000}
+#idlePc .pl,#vidle2 .pl{width:236px;flex:none;display:flex;flex-direction:column}
+#idlePc .pr,#vidle2 .pr{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
+#idlePc .pclk,#vidle2 .pclk{width:128px;height:128px;flex:none;display:block}
+.clkrow{display:flex;align-items:flex-end;gap:18px;margin:10px 0 8px}
+.wxv{flex-direction:column;align-items:flex-start;gap:4px}
+.wxv svg{width:28px;height:28px}
+.wxv .wx-t{font-size:20px}
+#idlePc .i-time,#vidle2 .i-time{font:300 76px/1 var(--num);letter-spacing:.02em;color:#cfcfcf;font-variant-numeric:tabular-nums}
+#idlePc .i-sec,#vidle2 .i-sec{font:400 20px/1 var(--mono);color:#858585}
+#vidle .i-sec{font:400 16px/1 var(--mono);color:#858585;margin-left:-8px}
+#idlePc .lbl,#vidle .lbl,#vidle2 .lbl{color:#858585}
+#idlePc .ih,#vidle2 .ih{display:flex;justify-content:space-between}
+#idlePc .it,#vidle2 .it{display:flex;align-items:baseline;justify-content:space-between;margin-top:4px}
+#idlePc .phd,#vidle2 .phd{display:flex;justify-content:space-between;align-items:center;height:22px}
+#idlePc .tg{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+#idlePc .tl{border:1px solid #2b2b2b;padding:7px 10px 8px;height:68px;display:flex;flex-direction:column;justify-content:space-between}
+#idlePc .tl .v{font:300 28px/1 var(--num);color:#cfcfcf}
+#idlePc .tl .v small{font-size:12px;color:#858585;margin-left:2px}
+#idlePc .tl .bar{height:2px;background:#2b2b2b}
+#idlePc .tl .bar i{display:block;height:100%;background:#6e6e6e}
+#idlePc .row,#vidle2 .row{border:1px solid #2b2b2b;height:34px;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:0 10px;font-size:13px;color:#b4b4b4;white-space:nowrap;min-width:0}
+#idlePc .row .np-t,#vidle2 .row .np-t{overflow:hidden;text-overflow:ellipsis;min-width:0}
+#idlePc .row.two{padding:0}
+#idlePc .rl{flex:1;min-width:0;display:flex;justify-content:space-between;align-items:center;padding:0 10px;height:100%}
+.wxc{display:flex;align-items:center;gap:6px;color:#b4b4b4}
+.wxc svg{width:20px;height:20px;display:block;flex:none}
+.wxc .wx-t{font:400 15px var(--mono);letter-spacing:.04em}
+#idlePc .wxc{padding:0 12px;height:100%;border-left:1px solid #2b2b2b}
+#idle .sum{font-size:13px;color:#b4b4b4}
+#vidle2 .im{display:flex;align-items:center;justify-content:space-between;height:24px}
+#vidle2 .im .v{font:400 15px var(--mono);letter-spacing:.08em;color:#b4b4b4}
+.bars2.panel{border:1px solid #2b2b2b;padding:8px 8px 0}
+#idle .dot.on{background:#b4b4b4;border-color:#b4b4b4}
+#vidle .vb{flex-direction:column;gap:10px}
+#vidle .vt{display:flex;justify-content:space-between;align-items:center;height:40px}
+#vidle .vtl{display:flex;align-items:center;gap:18px}
+#vidle .i-time{font:300 38px/1 var(--num);color:#cfcfcf;font-variant-numeric:tabular-nums}
+#vidle .vtr{display:flex;align-items:center;gap:18px;font-size:13px;color:#b4b4b4}
+#vidle .vtr .i-timer{font:400 15px var(--mono);letter-spacing:.08em;margin-left:8px}
+.bars2{flex:1;min-height:0;display:flex;align-items:stretch;gap:4px;border-bottom:1px solid #2b2b2b;transition:opacity 1.5s ease}
+.bars2.quiet{opacity:0}
+#vidle .vf{display:flex;justify-content:space-between;align-items:center;height:20px;font-size:12px;color:#b4b4b4;white-space:nowrap;gap:12px}
+#vidle .vf .np-t{overflow:hidden;text-overflow:ellipsis;min-width:0}
+.ia .wxc{gap:8px}
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <!-- 左: 時計 -->
+  <section id="left">
+    <div class="lhead">
+      <div><span class="lbl">LIVING ROOM</span><div class="d1" id="dJp"></div></div>
+      <div class="lbl r"><span id="dEn"></span><br><span id="dWk"></span></div>
+    </div>
+    <svg id="clock" viewBox="0 0 200 200" role="img" aria-label="アナログ時計">
+      <rect x="1" y="1" width="198" height="198" fill="#161616" stroke="#3a3a3a" stroke-width="1"/>
+      <g id="ticks"></g>
+      <g id="hH" transform="rotate(0 100 100)"><line x1="100" y1="110" x2="100" y2="60" stroke="#ececec" stroke-width="5"/></g>
+      <g id="hM" transform="rotate(0 100 100)"><line x1="100" y1="112" x2="100" y2="36" stroke="#ececec" stroke-width="3"/></g>
+      <g id="hS" transform="rotate(0 100 100)"><line x1="100" y1="118" x2="100" y2="22" stroke="#8a8a8a" stroke-width="1"/></g>
+      <rect x="95" y="95" width="10" height="10" fill="#161616" stroke="#ececec" stroke-width="2"/>
+    </svg>
+    <div class="wxnow" id="wxNow" role="button" aria-label="天気（タップで天気カードを開く）"><svg id="wxIco" class="wx-ico wx-i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true"></svg><span id="wxT" class="wx-t">--°</span></div>
+    <div class="digital"><span id="hhmm">00:00</span><span id="ss">00</span></div>
+  </section>
+
+  <!-- 右: カード -->
+  <section id="right">
+    <nav id="tabs">
+      <button type="button" class="b tab" data-i="0" id="tabRoom">部屋</button>
+      <button type="button" class="b tab" data-i="1" id="tabTimer">タイマー</button>
+      <button type="button" class="b tab" data-i="2">概要</button>
+      <button type="button" class="b tab" data-i="3">天気</button>
+      <button type="button" class="b tab" data-i="4">PC</button>
+      <button type="button" class="b" id="gear" aria-label="設定">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+          <path d="M3 6h18M3 12h18M3 18h18"/>
+          <rect x="14" y="3.5" width="4" height="5" fill="currentColor"/>
+          <rect x="6" y="9.5" width="4" height="5" fill="currentColor"/>
+          <rect x="12" y="15.5" width="4" height="5" fill="currentColor"/>
+        </svg>
+      </button>
+      <button type="button" class="b" id="idleBtn" aria-label="待機画面にする">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+        </svg>
+      </button>
+    </nav>
+
+    <div id="vp">
+      <div id="track">
+
+        <!-- 1: 部屋（1ページ目 エアコン / 2ページ目 照明。縦スワイプ） -->
+        <div class="page"><div class="vroom" id="vroom"><div class="vtrack" id="vtrack">
+          <div class="vpage" id="vAc">
+          <div class="card" id="cAc">
+          <div class="hd">
+            <span><span class="lbl">01 / AIR CON</span><b>エアコン</b></span>
+            <span class="sum"><i class="dot unsent" id="acDot"></i><span id="acSum"></span></span>
+          </div>
+          <div class="trow">
+            <div class="tval">
+              <span class="lbl">SET TEMP</span>
+              <span class="big"><span id="tNum">26</span><small id="tUnit">°C</small></span>
+            </div>
+            <div class="sl">
+              <input id="slider" class="rng" type="range" min="16" max="30" step="1" value="26" aria-label="設定温度">
+              <div class="ticks lbl"><span id="sMin">16</span><span id="sMid">23</span><span id="sMax">30</span></div>
+            </div>
+          </div>
+          <div class="line"><span class="lbl k">MODE</span><div class="seg n4" id="modes"></div></div>
+          <div class="line"><span class="lbl k">FAN</span><div class="seg n6" id="fans"></div></div>
+          <div class="acts t4">
+            <button type="button" class="b" id="acOn">ON</button>
+            <button type="button" class="b" id="acOff">OFF</button>
+            <button type="button" class="b tm" id="acOt">入タイマー<span class="sub" id="otSub">未設定</span></button>
+            <button type="button" class="b send" id="acSend">▶ 設定を送信</button>
+          </div>
+        </div>
+          <div class="card" id="cOt" hidden>
+            <div class="hd">
+              <span><span class="lbl">01 / ON TIMER</span><b>入タイマー</b></span>
+              <span class="sum"><i class="dot unsent" id="otDot"></i><span id="otSum"></span></span>
+            </div>
+            <div class="otw">
+              <div class="otl">
+                <div class="otprev"><div class="lbl"><span>設定予定</span><span>時刻になったら送信</span></div>
+                  <div class="row"><span class="pt" id="otPlanT">26<small>°C</small></span><span class="ps" id="otPlanM">冷房　風Auto</span></div></div>
+                <div class="otin" id="otIn"><span class="lbl cap">TIME</span><span class="d" id="otD0"></span><span class="d" id="otD1"></span><span class="c">:</span><span class="d" id="otD2"></span><span class="d" id="otD3"></span></div>
+                <div class="otrow"><button type="button" class="b send" id="otSet">▶ セット</button><button type="button" class="b" id="otClr">解除</button><button type="button" class="b" id="otBack">戻る</button></div>
+              </div>
+              <div class="otpad" id="otPad"></div>
+            </div>
+          </div>
+          </div>
+          <div class="vpage">
+          <div class="card">
+          <div class="hd">
+            <span><span class="lbl">02 / LIGHT</span><b>照明</b></span>
+            <span class="sum"><i class="dot unsent" id="ltDot"></i><span id="ltSum"></span></span>
+          </div>
+          <div class="bright">
+            <button type="button" class="b" id="bDn" aria-label="暗くする（長押しで連続）"><span class="sign">−</span><span class="lbl" style="color:inherit">暗く</span><span class="hint">長押しで連続</span></button>
+            <button type="button" class="b" id="bUp" aria-label="明るくする（長押しで連続）"><span class="sign">＋</span><span class="lbl" style="color:inherit">明るく</span><span class="hint">長押しで連続</span></button>
+          </div>
+          <div class="seg n4" id="lights"></div>
+        </div>
+          </div>
+        </div><div class="vdots" id="vdots"><i class="on"></i><i></i></div></div></div>
+
+        <!-- 3: タイマー -->
+        <div class="page"><div class="card">
+          <div class="hd">
+            <span><span class="lbl">02 / TIMER</span><b>タイマー</b></span>
+            <span class="lbl" id="tmState">READY</span>
+          </div>
+          <div class="disp idle" id="tmDisp"><span id="tmText">05:00</span></div>
+          <div class="trow2">
+            <button type="button" class="b step" id="tMinus" aria-label="1分減らす">−1分</button>
+            <button type="button" class="b step gap" id="tPlus" aria-label="1分増やす">＋1分</button>
+            <div class="seg n4" id="presets"></div>
+          </div>
+          <div class="acts2">
+            <button type="button" class="b" id="tStart">開始</button>
+            <button type="button" class="b" id="tReset">リセット</button>
+          </div>
+        </div></div>
+
+        <!-- 3: 概要 -->
+        <div class="page"><div class="card" id="cOv">
+          <div class="hd">
+            <span><span class="lbl">03 / OVERVIEW</span><b>概要</b></span>
+            <span class="lbl" id="ovNow"></span>
+          </div>
+          <div class="ov">
+            <div class="ovl">
+              <div class="ovdt"><div class="md"><span class="mo" id="ovMo"></span><span class="dd" id="ovDd"></span></div>
+                <div class="wd"><b id="ovWj"></b><span id="ovWe"></span></div></div>
+              <div class="ovrain"><div class="rh lbl"><span>RAIN mm/h</span><span>12h</span></div><div id="ovRain" style="flex:1;min-height:0;display:flex"></div></div>
+            </div>
+            <div class="ovr">
+              <div class="ovlh"><b id="ovDay"></b><span class="ovhl" id="ovHl"></span></div>
+              <div class="ovlw fit" id="ovLw"><div class="ovls" id="ovList"></div><div class="sb"><i id="ovThumb"></i></div></div>
+              <div class="ovleg"><span><i class="ev"></i>予定</span><span><i></i>TODO</span></div>
+            </div>
+          </div>
+        </div></div>
+
+        <!-- 4: 天気 -->
+        <div class="page"><div class="card">
+          <div class="hd">
+            <span><span class="lbl">04 / WEATHER</span><b>天気</b></span>
+            <span class="sum"><span class="lbl" id="wxMeta"></span><i class="dot unsent" id="wxDot"></i><span id="wxSum">未取得</span></span>
+          </div>
+          <div class="wxbody">
+            <div class="wxcol"><span>時刻</span><span>天気</span><span>気温 °C</span><span>降水 mm</span><span>風 m/s</span><span>湿度 %</span></div>
+            <div id="wxList"></div>
+          </div>
+        </div></div>
+
+        <!-- 5: PC -->
+        <div class="page"><div class="card off" id="cPc">
+          <div class="hd">
+            <span><span class="lbl">05 / PC</span><b>PC</b></span>
+            <span class="sum"><i class="dot unsent pc-dot"></i><span class="pc-sum">未接続</span><button type="button" class="b vbtn" id="vBtn" aria-label="ビジュアライザーの切り替え">VIS</button></span>
+          </div>
+          <div class="vis"><div class="bars" id="bars"></div><div class="vnp"><span class="t pc-np"></span><span class="tm pc-tm"></span></div></div>
+          <div class="pcgrid">
+            <div class="tile"><span class="lbl">CPU</span><span class="v"><b class="pc-cpu">--</b><small>%</small></span><div class="bar"><i class="pcb-cpu" style="width:0"></i></div><span class="sub pc-cpuS">—</span></div>
+            <div class="tile"><span class="lbl">MEM</span><span class="v"><b class="pc-mem">--</b><small>%</small></span><div class="bar"><i class="pcb-mem" style="width:0"></i></div><span class="sub pc-memS">—</span></div>
+            <div class="tile"><span class="lbl">GPU</span><span class="v"><b class="pc-gpu">--</b><small>%</small></span><div class="bar"><i class="pcb-gpu" style="width:0"></i></div><span class="sub pc-gpuS">—</span></div>
+            <div class="tile"><span class="lbl">NET ↓</span><span class="v"><b class="pc-net">--</b><small>MB/s</small></span><div class="bar"><i class="pcb-net" style="width:0"></i></div><span class="sub pc-netS">—</span></div>
+          </div>
+          <div class="np none"><span class="t pc-np"></span><span class="tm pc-tm"></span><div class="sk lock" id="mSeek"><div class="skb"><i class="pc-pg" style="width:0"></i></div></div></div>
+          <div class="mrow">
+            <button type="button" class="b" id="mPrev" aria-label="前の曲"><svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><path d="M6 5h2v14H6zM20 5v14L9 12z"/></svg></button>
+            <button type="button" class="b" id="mPlay" aria-label="再生・一時停止"><svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg></button>
+            <button type="button" class="b" id="mNext" aria-label="次の曲"><svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><path d="M16 5h2v14h-2zM4 5l11 7L4 19z"/></svg></button>
+          </div>
+          <div class="pcvol">
+            <span class="lbl k">VOL</span>
+            <button type="button" class="b" id="vDn" aria-label="音量を下げる" style="width:44px">−</button>
+            <div class="volbar lock" id="volBar"><i class="pc-volbar" style="width:0"></i><span class="pc-vol">--</span></div>
+            <button type="button" class="b" id="vUp" aria-label="音量を上げる" style="width:44px">＋</button>
+            <button type="button" class="b" id="vMute" style="width:76px;margin-left:6px">ミュート</button>
+          </div>
+        </div></div>
+
+      </div>
+      <div id="toast" hidden></div>
+    </div>
+  </section>
+
+  <!-- 待機画面（無操作時） -->
+  <div id="idle" aria-hidden="true">
+    <div id="idlePc"><div class="pcw" id="pcwI">
+      <div class="pl">
+        <div class="clkrow"><svg id="pClock" class="pclk" viewBox="0 0 200 200" aria-hidden="true">
+          <rect x="1" y="1" width="198" height="198" fill="#000" stroke="#2b2b2b" stroke-width="1"/>
+          <g id="pTicks"></g>
+          <g id="pH" transform="rotate(0 100 100)"><line x1="100" y1="110" x2="100" y2="60" stroke="#cfcfcf" stroke-width="5"/></g>
+          <g id="pM" transform="rotate(0 100 100)"><line x1="100" y1="112" x2="100" y2="36" stroke="#cfcfcf" stroke-width="3"/></g>
+          <g id="pS" transform="rotate(0 100 100)"><line x1="100" y1="118" x2="100" y2="22" stroke="#6e6e6e" stroke-width="1"/></g>
+          <rect x="95" y="95" width="10" height="10" fill="#000" stroke="#cfcfcf" stroke-width="2"/>
+        </svg><span class="wxc wxv"><svg class="wx-ico wx-i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true"></svg><span class="wx-t">--°</span></span></div>
+        <div class="ih"><span class="lbl">LIVING ROOM</span><span class="lbl i-date"></span></div>
+        <div class="it"><span class="i-time">00:00</span><span class="i-sec">00</span></div>
+        <div class="im i-timerrow" style="visibility:hidden"><span class="lbl">TIMER</span><span class="v i-timer">00:00</span></div>
+      </div>
+      <div class="pr">
+        <div class="phd"><span class="lbl">PC</span><span class="sum"><i class="dot pc-dot"></i><span class="pc-sum">--</span></span></div>
+        <div class="tg"><div class="tl"><span class="lbl">CPU</span><span class="v"><b class="pc-cpu">--</b><small>%</small></span><div class="bar"><i class="pcb-cpu" style="width:0"></i></div></div><div class="tl"><span class="lbl">MEM</span><span class="v"><b class="pc-mem">--</b><small>%</small></span><div class="bar"><i class="pcb-mem" style="width:0"></i></div></div><div class="tl"><span class="lbl">GPU</span><span class="v"><b class="pc-gpu">--</b><small>%</small></span><div class="bar"><i class="pcb-gpu" style="width:0"></i></div></div><div class="tl"><span class="lbl">NET ↓</span><span class="v"><b class="pc-net">--</b><small>MB/s</small></span><div class="bar"><i class="pcb-net" style="width:0"></i></div></div></div>
+        <div class="row"><span class="lbl">NOW</span><span class="np-t pc-np2">--</span></div>
+        <div class="row"><span class="lbl">AIR CON</span><span class="sum"><i class="dot unsent i-dot"></i><span class="i-ac"></span></span></div>
+      </div>
+    </div></div>
+    <div id="vidle"><div class="pcw vb" id="pcwV">
+      <div class="vt">
+        <span class="vtl"><b class="i-time">00:00</b><span class="i-sec">00</span><span class="lbl i-date"></span><span class="wxc"><svg class="wx-ico wx-i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true"></svg><span class="wx-t">--°</span></span></span>
+        <span class="vtr"><span class="i-timerrow" style="visibility:hidden"><span class="lbl">TIMER</span><span class="i-timer">00:00</span></span><span class="lbl">PC · VISUALIZER</span></span>
+      </div>
+      <div class="bars2" id="bars2"></div>
+      <div class="vf"><span class="np-t pc-np2">--</span><span class="sum"><i class="dot unsent i-dot"></i><span class="i-ac"></span></span></div>
+    </div></div>
+    <div id="vidle2"><div class="pcw" id="pcwW">
+      <div class="pl">
+        <div class="clkrow"><svg id="qClock" class="pclk" viewBox="0 0 200 200" aria-hidden="true">
+          <rect x="1" y="1" width="198" height="198" fill="#000" stroke="#2b2b2b" stroke-width="1"/>
+          <g id="qTicks"></g>
+          <g id="qH" transform="rotate(0 100 100)"><line x1="100" y1="110" x2="100" y2="60" stroke="#cfcfcf" stroke-width="5"/></g>
+          <g id="qM" transform="rotate(0 100 100)"><line x1="100" y1="112" x2="100" y2="36" stroke="#cfcfcf" stroke-width="3"/></g>
+          <g id="qS" transform="rotate(0 100 100)"><line x1="100" y1="118" x2="100" y2="22" stroke="#6e6e6e" stroke-width="1"/></g>
+          <rect x="95" y="95" width="10" height="10" fill="#000" stroke="#cfcfcf" stroke-width="2"/>
+        </svg><span class="wxc wxv"><svg class="wx-ico wx-i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true"></svg><span class="wx-t">--°</span></span></div>
+        <div class="ih"><span class="lbl">LIVING ROOM</span><span class="lbl i-date"></span></div>
+        <div class="it"><span class="i-time">00:00</span><span class="i-sec">00</span></div>
+        <div class="im i-timerrow" style="visibility:hidden"><span class="lbl">TIMER</span><span class="v i-timer">00:00</span></div>
+      </div>
+      <div class="pr">
+        <div class="phd"><span class="lbl">PC · VISUALIZER</span><span class="sum"><i class="dot pc-dot"></i><span class="pc-sum">--</span></span></div>
+        <div class="bars2 panel" id="bars3"></div>
+        <div class="row"><span class="lbl">NOW</span><span class="np-t pc-np2">--</span></div>
+        <div class="row"><span class="lbl">AIR CON</span><span class="sum"><i class="dot unsent i-dot"></i><span class="i-ac"></span></span></div>
+      </div>
+    </div></div>
+    <div id="idleBlock">
+      <svg id="iClock" viewBox="0 0 200 200" aria-hidden="true">
+        <rect x="1" y="1" width="198" height="198" fill="#000" stroke="#2b2b2b" stroke-width="1"/>
+        <g id="iTicks"></g>
+        <g id="iH" transform="rotate(0 100 100)"><line x1="100" y1="110" x2="100" y2="60" stroke="#cfcfcf" stroke-width="5"/></g>
+        <g id="iM" transform="rotate(0 100 100)"><line x1="100" y1="112" x2="100" y2="36" stroke="#cfcfcf" stroke-width="3"/></g>
+        <g id="iS" transform="rotate(0 100 100)"><line x1="100" y1="118" x2="100" y2="22" stroke="#6e6e6e" stroke-width="1"/></g>
+        <rect x="95" y="95" width="10" height="10" fill="#000" stroke="#cfcfcf" stroke-width="2"/>
+      </svg>
+      <div class="itxt">
+      <div class="ih"><span class="lbl">LIVING ROOM</span><span class="lbl i-date" id="iDate"></span></div>
+      <div class="it"><span id="iTime" class="i-time">00:00</span><span id="iSec" class="i-sec">00</span></div>
+      <div class="ir"></div>
+      <div class="ia"><span class="lbl">AIR CON</span><span class="sum"><i class="dot unsent i-dot" id="iDot"></i><span id="iAc" class="i-ac"></span></span></div>
+      <div class="ia"><span class="lbl">WEATHER</span><span class="wxc"><svg class="wx-ico wx-i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true"></svg><span class="wx-t">--°</span></span></div>
+      <div class="im i-timerrow" id="iTimerRow" style="visibility:hidden"><span class="lbl">TIMER</span><span class="v i-timer" id="iTimer">00:00</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ブラウザ単体で開いたとき用のダミー（アプリ内では Kotlin 側の Native が使われる） */
+  if (!window.Native) {
+    var memo = '{}';
+    window.Native = {
+      send: function (id, target, command, parameter, type) {
+        console.log('[mock send]', target, command, parameter, type);
+        setTimeout(function () { window.onNativeResult(id, true, '成功'); }, 250);
+      },
+      getConfig: function () { return JSON.stringify({ configured: true, nightCmd: '常夜灯', allCmd: '全灯', pulseMs: 600, idleSec: 60, pcConfigured: false, googleConfigured: true }); },
+      loadState: function () { return memo; },
+      saveState: function (s) { memo = s; },
+      openSettings: function () { console.log('[mock] openSettings'); },
+      alarm: function (on) { console.log('[mock] alarm', on); },
+      pcRequest: function (id, method, path, body) {
+        setTimeout(function () {
+          var t = Date.now() / 1000;
+          if (path === '/status') window.onPcResult(id, true, 'OK', JSON.stringify({ cpu: 20 + Math.round(10 * Math.sin(t / 3)), cpu_ghz: 3.8, mem: 61, mem_used_gb: 9.8, mem_total_gb: 16,
+            gpu: 12, gpu_temp: 54, net_down: 3.2, net_up: 0.4, volume: 60, muted: false,
+            media: { available: true, title: 'Midnight Drive', artist: 'Sample Artist', playing: true, pos: 72, dur: 225 } }));
+          else window.onPcResult(id, true, 'OK', '{"ok":true}');
+        }, 100);
+      },
+      pcVis: function (on) {
+        console.log('[mock] pcVis', on);
+        clearInterval(window.__visT);
+        if (on) window.__visT = setInterval(function () {
+          var a = [], t = Date.now() / 300;
+          for (var i = 0; i < 32; i++) a.push(Math.round(Math.max(2, 80 * Math.exp(-Math.pow((i - 6) / 10, 2)) * (0.6 + 0.4 * Math.sin(t + i)) * (1 - i / 50))));
+          window.onVis(a.join(';'));
+        }, 33);
+      },
+      fetchGoogle: function (id, tmin, tmax) {
+        console.log('[mock] fetchGoogle');
+        setTimeout(function () {
+          var d = new Date(), p2 = function (n) { return (n < 10 ? '0' : '') + n; }, ymd = function (x) { return x.getFullYear() + '-' + p2(x.getMonth() + 1) + '-' + p2(x.getDate()); };
+          var tm = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1), at = function (x, h, m) { return new Date(x.getFullYear(), x.getMonth(), x.getDate(), h, m).toISOString(); };
+          window.onGoogleResult(id, true, 'OK', JSON.stringify({ errCal: '', errTask: '', undated: false,
+            events: [{ title: '燃えるごみ', allDay: true, start: ymd(tm), end: ymd(new Date(tm.getTime() + 86400000)) }, { title: '歯科検診', allDay: false, start: at(tm, 9, 30), end: at(tm, 10, 30) },
+              { title: 'ランチ 田中さん', allDay: false, start: at(tm, 12, 0), end: at(tm, 13, 0) }, { title: '週次ミーティング', allDay: false, start: at(tm, 14, 0), end: at(tm, 15, 0) }],
+            tasks: [{ title: '牛乳を買う', due: ymd(tm) }, { title: '請求書を送る', due: ymd(tm) }] }));
+        }, 300);
+      },
+      fetchWeather: function (id) {
+        console.log('[mock] fetchWeather');
+        setTimeout(function () {
+          var p2 = function (n) { return (n < 10 ? '0' : '') + n; }, base = new Date(); base.setHours(0, 0, 0, 0);
+          var t = [], c = [], tp = [], pr = [], w = [], hu = [], codes = [0, 1, 2, 3, 45, 51, 61, 63, 71, 80, 95, 3];
+          for (var i = 0; i < 48; i++) {
+            var d = new Date(base.getTime() + i * 3600000);
+            t.push(d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()) + 'T' + p2(d.getHours()) + ':00');
+            c.push(codes[Math.floor(i / 2) % 12]); tp.push(Math.round((18 + 6 * Math.sin((i - 9) / 24 * 2 * Math.PI)) * 10) / 10);
+            pr.push(c[i] >= 51 ? Math.round(i % 5 * 3) / 10 : 0); w.push(Math.round((2 + i % 7) * 36) / 10); hu.push(55 + (i * 3) % 40);
+          }
+          window.onWeatherResult(id, true, 'OK', JSON.stringify({ utc_offset_seconds: -new Date().getTimezoneOffset() * 60,
+            hourly_units: { wind_speed_10m: 'km/h' },
+            hourly: { time: t, temperature_2m: tp, weathercode: c, precipitation: pr, wind_speed_10m: w, relative_humidity_2m: hu } }));
+        }, 400);
+      }
+    };
+  }
+  const N = window.Native;
+
+  const $ = (id) => document.getElementById(id);
+  const pad = (n) => String(n).padStart(2, '0');
+  function el(tag, cls, text) {
+    const e = document.createElement(tag);
+    e.type = 'button';
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  }
+
+  /* ---------- 定数（Python版 main.py と同じ値） ---------- */
+  const FAN_OPTIONS = ['Auto', '1', '2', '3', '4', '5'];
+  const FAN_MAP = { 'Auto': 1, '1': 2, '2': 3, '3': 4, '4': 5, '5': 6 };
+  const MODES = ['冷房', '暖房', '除湿', '自動'];
+  const MODE_MAP = { '冷房': 2, '暖房': 5, '除湿': 3, '自動': 1 };
+  const PHASE = { unsent: '未送信', on: 'ON', off: 'OFF' };
+  const LIGHT_LABEL = { on: 'ON', off: 'OFF', all: '全灯', night: '常夜灯' };
+
+  function limits(mode) { return mode === '自動' ? [-3, 3] : [16, 30]; }   // 自動は相対値
+  function clampTemp(mode, t) { const l = limits(mode); return Math.max(l[0], Math.min(l[1], t)); }
+  function signed(t) { return (t >= 0 ? '+' : '-') + Math.abs(t); }
+  function fmtTemp(t, mode) { return mode === '自動' ? signed(t) : t + '°C'; }
+
+  /* ---------- 設定・状態 ---------- */
+  let cfg = { googleConfigured: false, taskUndated: false, configured: false, nightCmd: '常夜灯', allCmd: '全灯', pulseMs: 600, idleSec: 60, lat: '35.6895', lon: '139.6917', model: 'jma_msm', pcConfigured: false, visSmooth: true, visPeak: false, visLayout: 1 };
+  function loadCfg() { try { Object.assign(cfg, JSON.parse(N.getConfig())); } catch (e) {} document.documentElement.classList.toggle('vpeak', !!cfg.visPeak); }
+  window.onSettingsChanged = function () { loadCfg(); renderAll(); touched(); if (wxCfgKey() !== wxKey) fetchWx(); if (ggCfgKey() !== GG.key) { GG.at = 0; fetchGg(); } visSent = null; syncVis(); pcPoll(); };
+
+  let visOn = false;                   // PCカード・待機画面をビジュアライザーにするか（保存される）
+  let ac = { temperature: 26, fan: 'Auto', mode: '冷房', power: false };   // 最後に送信が成功した設定
+  let ot = null;                       // 入タイマー { at: 実行時刻(ms), t: 温度, m: モード, f: 風量 }。セットされていなければ null
+  try {
+    const s = JSON.parse(N.loadState() || '{}');
+    if (s.ac) {
+      if (MODES.indexOf(s.ac.mode) >= 0) ac.mode = s.ac.mode;
+      if (FAN_OPTIONS.indexOf(s.ac.fan_speed) >= 0) ac.fan = s.ac.fan_speed;
+      if (typeof s.ac.temperature === 'number') ac.temperature = clampTemp(ac.mode, Math.round(s.ac.temperature));
+      ac.power = !!s.ac.power;
+    }
+    visOn = !!s.vis;
+    if (s.ot && isFinite(s.ot.at) && isFinite(s.ot.t) && MODES.indexOf(s.ot.m) >= 0 && FAN_OPTIONS.indexOf(s.ot.f) >= 0) ot = { at: +s.ot.at, t: +s.ot.t, m: s.ot.m, f: s.ot.f };
+  } catch (e) {}
+  let draft = Object.assign({}, ac);   // 編集中の設定。「設定を送信」が成功するまで表示には反映しない
+  let acSent = false;                  // 起動後まだ送信が成功していない間は「未送信」（実機の状態は不明）
+  let acInflight = false;
+  let light = null;                    // 最後に送った照明の操作: on / off / all / night
+  function saveState() {
+    try { N.saveState(JSON.stringify({ vis: visOn, ac: { temperature: ac.temperature, fan_speed: ac.fan, mode: ac.mode, power: ac.power }, ot: ot })); } catch (e) {}
+  }
+
+  /* ---------- Kotlin 側へのコマンド送信 ---------- */
+  let seq = 0;
+  const pending = {};
+  function send(target, command, parameter, commandType, cb) {
+    const id = String(++seq);
+    pending[id] = cb;
+    try { N.send(id, target, command, parameter || 'default', commandType || 'command'); }
+    catch (e) { delete pending[id]; cb(false, String(e)); }
+  }
+  window.onNativeResult = function (id, ok, msg) {
+    const cb = pending[id];
+    delete pending[id];
+    if (cb) cb(ok, msg);
+  };
+
+  let toastTimer = null;
+  function toast(ok, msg) {
+    const t = $('toast');
+    t.className = ok ? 'ok' : 'err';
+    t.textContent = (ok ? '✓ ' : '✗ ') + msg;
+    t.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.hidden = true; }, ok ? 2000 : 4500);
+  }
+
+  /* ---------- 時計 ---------- */
+  function buildTicks(id, cMajor, cMinor) {
+    let h = '';
+    for (let i = 0; i < 60; i++) {
+      const a = i * 6 * Math.PI / 180, major = i % 5 === 0, r1 = major ? 76 : 85, r2 = 92;
+      h += '<line x1="' + (100 + r1 * Math.sin(a)).toFixed(2) + '" y1="' + (100 - r1 * Math.cos(a)).toFixed(2) +
+        '" x2="' + (100 + r2 * Math.sin(a)).toFixed(2) + '" y2="' + (100 - r2 * Math.cos(a)).toFixed(2) +
+        '" stroke="' + (major ? cMajor : cMinor) + '" stroke-width="' + (major ? 2 : 1) + '"/>';
+    }
+    $(id).innerHTML = h;
+  }
+  buildTicks('ticks', '#ececec', '#5a5a5a');     // 操作画面の時計
+  buildTicks('iTicks', '#8a8a8a', '#3d3d3d');    // 待機画面の時計（暗め）
+  buildTicks('pTicks', '#8a8a8a', '#3d3d3d');    // 待機画面（PC接続時）の時計
+  buildTicks('qTicks', '#8a8a8a', '#3d3d3d');    // 待機画面（VIS・レイアウト2）の時計
+  const WJP = ['日', '月', '火', '水', '木', '金', '土'];
+  const WEN = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+  function updateClock() {
+    const d = new Date(), H = d.getHours(), M = d.getMinutes(), S = d.getSeconds();
+    $('hhmm').textContent = pad(H) + ':' + pad(M);
+    $('ss').textContent = pad(S);
+    $('dJp').textContent = (d.getMonth() + 1) + '月' + d.getDate() + '日 ' + WJP[d.getDay()] + '曜日';
+    $('dEn').textContent = d.getFullYear() + '.' + pad(d.getMonth() + 1) + '.' + pad(d.getDate());
+    $('dWk').textContent = WEN[d.getDay()];
+    const rh = 'rotate(' + (((H % 12) + M / 60) * 30).toFixed(2) + ' 100 100)';
+    const rm = 'rotate(' + ((M + S / 60) * 6).toFixed(2) + ' 100 100)';
+    const rs = 'rotate(' + (S * 6) + ' 100 100)';
+    $('hH').setAttribute('transform', rh); $('hM').setAttribute('transform', rm); $('hS').setAttribute('transform', rs);
+    $('iH').setAttribute('transform', rh); $('iM').setAttribute('transform', rm); $('iS').setAttribute('transform', rs);
+    $('pH').setAttribute('transform', rh); $('pM').setAttribute('transform', rm); $('pS').setAttribute('transform', rs);
+    $('qH').setAttribute('transform', rh); $('qM').setAttribute('transform', rm); $('qS').setAttribute('transform', rs);
+  }
+
+  /* ---------- エアコン ---------- */
+  const slider = $('slider');
+  const modeBtns = MODES.map(function (m) {
+    const b = el('button', 'b', m);
+    b.dataset.v = m;
+    b.addEventListener('click', function () {
+      draft.mode = m;
+      draft.temperature = clampTemp(m, draft.temperature);
+      renderAc();
+    });
+    $('modes').appendChild(b);
+    return b;
+  });
+  const fanBtns = FAN_OPTIONS.map(function (f) {
+    const b = el('button', 'b', f === 'Auto' ? 'AUTO' : f);
+    b.dataset.v = f;
+    b.addEventListener('click', function () { draft.fan = f; renderAc(); });
+    $('fans').appendChild(b);
+    return b;
+  });
+  slider.addEventListener('input', function () {
+    draft.temperature = clampTemp(draft.mode, parseInt(slider.value, 10));
+    renderAc();
+  });
+
+  function dirty() { return draft.temperature !== ac.temperature || draft.mode !== ac.mode || draft.fan !== ac.fan; }
+  function acPhase() { return !acSent ? 'unsent' : (ac.power ? 'on' : 'off'); }
+
+  function renderAc() {
+    const auto = draft.mode === '自動', lim = limits(draft.mode);
+    slider.min = lim[0];
+    slider.max = lim[1];
+    if (parseInt(slider.value, 10) !== draft.temperature) slider.value = draft.temperature;
+    const f = (draft.temperature - lim[0]) / (lim[1] - lim[0]);
+    slider.style.setProperty('--p', 'calc(8px + (100% - 16px) * ' + f + ')');
+    $('tNum').textContent = auto ? signed(draft.temperature) : String(draft.temperature);
+    $('tUnit').textContent = auto ? '' : '°C';
+    $('sMin').textContent = auto ? '-3' : '16';
+    $('sMid').textContent = auto ? '0' : '23';
+    $('sMax').textContent = auto ? '+3' : '30';
+    modeBtns.forEach(function (b) { b.classList.toggle('on', b.dataset.v === draft.mode); });
+    fanBtns.forEach(function (b) { b.classList.toggle('on', b.dataset.v === draft.fan); });
+    $('acSend').disabled = !(dirty() && !acInflight);
+    const ph = acPhase();
+    $('acDot').className = 'dot ' + ph;
+    $('acSum').textContent = PHASE[ph] + '  ' + fmtTemp(ac.temperature, ac.mode) + '  ' + ac.mode + '  風' + ac.fan;
+    $('acOn').classList.toggle('on', ph === 'on');
+    $('acOff').classList.toggle('on', ph === 'off');
+    renderOt();
+  }
+
+  function acPower(on) {
+    send('ac', on ? 'turnOn' : 'turnOff', 'default', 'command', function (ok, msg) {
+      if (ok) {
+        acSent = true; ac.power = on; saveState();
+        toast(true, 'エアコン ' + (on ? 'ON' : 'OFF'));
+      } else toast(false, 'エアコン: ' + msg);
+      renderAc();
+    });
+  }
+  $('acOn').addEventListener('click', function () { acPower(true); });
+  $('acOff').addEventListener('click', function () { acPower(false); });
+
+  function acApply(s, done) {
+    const param = s.temperature + ',' + MODE_MAP[s.mode] + ',' + FAN_MAP[s.fan] + ',on';   // setAll は電源ONを含む
+    acInflight = true;
+    renderAc();
+    send('ac', 'setAll', param, 'command', function (ok, msg) {
+      acInflight = false;
+      if (ok) {
+        const wasClean = !dirty();
+        acSent = true;
+        ac = Object.assign({}, s, { power: true });
+        if (wasClean) draft = Object.assign({}, ac);
+        saveState();
+        toast(true, 'エアコン 設定送信 ' + fmtTemp(s.temperature, s.mode) + ' / ' + s.mode + ' / 風' + s.fan);
+      } else toast(false, 'エアコン: ' + msg);
+      renderAc();
+      if (done) done(ok);
+    });
+  }
+  $('acSend').addEventListener('click', function () {
+    if (!dirty() || acInflight) return;
+    acApply(Object.assign({}, draft));
+  });
+
+  /* ---------- 入タイマー ----------
+     エアコンの画面で「入タイマー」を押すと、そのとき表示している設定が「設定予定」になる（送信済みかどうかは関係ない）。
+     時刻を入れて「セット」すると、その時刻に「設定を送信」と同じ操作（電源ONを含む）を自動で行う。 */
+  let otOpen = false, otDigits = '', otPlan = null, otRetryAt = 0;
+  const hmOf = function (ms) { const d = new Date(ms); return pad(d.getHours()) + ':' + pad(d.getMinutes()); };
+  function otLabel(o) {
+    const n = new Date(), d = new Date(o.at);
+    return hmOf(o.at) + (d.getDate() !== n.getDate() || d.getMonth() !== n.getMonth() ? '（明日）' : '');
+  }
+  function renderOt() {
+    const armed = !!ot;
+    $('acOt').classList.toggle('armed', armed);
+    $('tabRoom').classList.toggle('armed', armed);
+    $('otSub').textContent = armed ? otLabel(ot) : '未設定';
+    $('cAc').hidden = otOpen;
+    $('cOt').hidden = !otOpen;
+    if (!otOpen) return;
+    $('otDot').className = 'dot ' + (armed ? 'on' : 'off');
+    $('otSum').textContent = armed ? '現在のセット ' + otLabel(ot) : '未セット';
+    if (otPlan) {
+      $('otPlanT').innerHTML = (otPlan.m === '自動' ? signed(otPlan.t) : otPlan.t + '<small>°C</small>');
+      $('otPlanM').textContent = otPlan.m + '　風' + otPlan.f;
+    }
+    for (let i = 0; i < 4; i++) {
+      const e = $('otD' + i), ch = otDigits[i];
+      e.textContent = ch != null ? ch : '□';
+      e.className = 'd' + (ch == null ? ' e' : '') + (i === otDigits.length ? ' cur' : '');
+    }
+    $('otSet').disabled = otDigits.length !== 4;
+  }
+  function openOt() { otOpen = true; otDigits = ''; otPlan = { t: draft.temperature, m: draft.mode, f: draft.fan }; renderOt(); }
+  function closeOt() { otOpen = false; renderOt(); }
+  function otPush(d) {
+    let t = otDigits;
+    if (t.length >= 4) return;
+    if (t.length === 0 && +d > 2) t = '0';            // 7 → 07
+    if (t.length === 1 && t[0] === '2' && +d > 3) return;   // 24時以降は入れられない
+    if (t.length === 2 && +d > 5) return;             // 分の十の位は 0〜5
+    otDigits = t + d;
+    renderOt();
+  }
+  (function buildPad() {
+    ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', 'B'].forEach(function (k) {
+      const b = el('button', 'b' + (k === 'C' || k === 'B' ? ' f' : ''), k === 'C' ? 'クリア' : (k === 'B' ? '⌫' : k));
+      b.addEventListener('click', function () {
+        if (k === 'C') { otDigits = ''; renderOt(); }
+        else if (k === 'B') { otDigits = otDigits.slice(0, -1); renderOt(); }
+        else otPush(k);
+      });
+      $('otPad').appendChild(b);
+    });
+  })();
+  $('acOt').addEventListener('click', openOt);
+  $('otBack').addEventListener('click', closeOt);
+  $('otClr').addEventListener('click', function () {
+    if (ot) { ot = null; saveState(); toast(true, '入タイマーを解除しました'); }
+    renderOt();
+  });
+  $('otSet').addEventListener('click', function () {
+    if (otDigits.length !== 4 || !otPlan) return;
+    const H = +otDigits.slice(0, 2), M = +otDigits.slice(2), n = new Date();
+    const t = new Date(n.getFullYear(), n.getMonth(), n.getDate(), H, M, 0, 0);
+    if (t.getTime() <= Date.now() + 1000) t.setDate(t.getDate() + 1);       // 過ぎた時刻なら明日
+    ot = { at: t.getTime(), t: otPlan.t, m: otPlan.m, f: otPlan.f };
+    otRetryAt = 0;
+    saveState();
+    toast(true, '入タイマー ' + otLabel(ot) + ' にセットしました');
+    closeOt();
+  });
+  function tickOt() {                                  // 約0.25秒ごと
+    if (!ot || acInflight) return;
+    const now = Date.now();
+    if (now < ot.at) return;
+    if (now - ot.at > 10 * 60 * 1000) {                // 10分以上過ぎていたら実行しない（アプリを閉じていたときなど）
+      ot = null; saveState(); toast(false, '入タイマー: 時刻を過ぎていたため実行しませんでした'); renderOt(); return;
+    }
+    if (now < otRetryAt) return;
+    const o = ot;
+    acApply({ temperature: o.t, mode: o.m, fan: o.f }, function (ok) {
+      if (ok) { if (ot === o) { ot = null; saveState(); } otRetryAt = 0; }
+      else otRetryAt = Date.now() + 15000;             // 失敗したら15秒ごとに、10分まで再試行
+      renderOt();
+    });
+  }
+
+  /* 部屋: 縦スワイプで エアコン ⇄ 照明 */
+  let roomSub = 0;
+  function roomGo(i) {
+    roomSub = Math.max(0, Math.min(1, i));
+    $('vtrack').style.transform = 'translateY(' + (-roomSub * 50) + '%)';
+    const dots = $('vdots').children;
+    for (let k = 0; k < dots.length; k++) dots[k].classList.toggle('on', k === roomSub);
+  }
+
+  /* ---------- 照明 ---------- */
+  function renderLight() {
+    $('ltDot').className = 'dot ' + (light === 'on' || light === 'all' || light === 'night' ? 'on' : (light === 'off' ? 'off' : 'unsent'));
+    $('ltSum').textContent = light ? LIGHT_LABEL[light] : '未送信';
+  }
+  function lightSend(command, type, label, key, quiet) {
+    send('light', command, 'default', type, function (ok, msg) {
+      if (ok) {
+        if (key) { light = key; renderLight(); }
+        if (!quiet) toast(true, '照明 ' + label);
+      } else toast(false, '照明 ' + label + ': ' + msg);
+    });
+  }
+  const lightBtns = [['on', 'ON'], ['off', 'OFF'], ['all', '全灯'], ['night', '常夜灯']].map(function (p) {
+    const b = el('button', 'b', p[1]);
+    b.dataset.v = p[0];
+    b.addEventListener('click', function () {
+      if (p[0] === 'on') lightSend('turnOn', 'command', 'ON', 'on');
+      else if (p[0] === 'off') lightSend('turnOff', 'command', 'OFF', 'off');
+      else if (p[0] === 'all') lightSend(cfg.allCmd, 'customize', cfg.allCmd, 'all');
+      else lightSend(cfg.nightCmd, 'customize', cfg.nightCmd, 'night');
+    });
+    $('lights').appendChild(b);
+    return b;
+  });
+
+  /* 長押しで連続送信。タップは指を離したときに1回だけ送る。
+     スワイプで切り替えようとして指が動いた場合は送らない（誤操作防止）。 */
+  const holds = [];
+  function cancelHolds() { holds.forEach(function (h) { h.cancel(); }); }
+  function holdButton(btn, command, label) {
+    let delay = null, rep = null, cap = null, active = false, repeating = false, moved = false, sx = 0, sy = 0;
+    function stopTimers() { clearTimeout(delay); clearInterval(rep); clearTimeout(cap); delay = rep = cap = null; }
+    function end() { stopTimers(); active = false; repeating = false; btn.classList.remove('press'); }
+    function pulse() { lightSend(command, 'command', label, null, true); }
+    btn.addEventListener('pointerdown', function (e) {
+      if (active) return;
+      active = true; repeating = false; moved = false; sx = e.clientX; sy = e.clientY;
+      try { btn.setPointerCapture(e.pointerId); } catch (_) {}
+      btn.classList.add('press');
+      delay = setTimeout(function () {
+        repeating = true;
+        pulse();
+        rep = setInterval(pulse, Math.max(400, cfg.pulseMs));
+        cap = setTimeout(end, 20000);   // 離したイベントを取りこぼしても、20秒で必ず止める
+      }, 350);
+    });
+    btn.addEventListener('pointermove', function (e) {
+      if (active && !moved && Math.hypot(e.clientX - sx, e.clientY - sy) > 14) { moved = true; stopTimers(); }
+    });
+    btn.addEventListener('pointerup', function () {
+      if (!active) return;
+      const tap = !repeating && !moved;
+      end();
+      if (tap) lightSend(command, 'command', label, null, false);
+    });
+    btn.addEventListener('pointercancel', end);
+    btn.addEventListener('lostpointercapture', end);
+    btn.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+    holds.push({ cancel: end });
+  }
+  holdButton($('bDn'), 'brightnessDown', '明るさ－');
+  holdButton($('bUp'), 'brightnessUp', '明るさ＋');
+  window.addEventListener('blur', cancelHolds);
+  document.addEventListener('visibilitychange', cancelHolds);
+
+  /* ---------- タイマー（エアコン・照明とは連動しない単体のタイマー） ---------- */
+  const T = { set: 300, running: false, endAt: 0, left: 300, done: false };
+  let alarmOn = false;
+  function leftNow() { return T.running ? Math.max(0, Math.ceil((T.endAt - Date.now()) / 1000)) : T.left; }
+  function alarm(on) { if (alarmOn === on) return; alarmOn = on; try { N.alarm(on); } catch (e) {} }
+  function setTimerSet(sec) {
+    if (T.running) return;
+    T.set = Math.max(60, Math.min(180 * 60, sec));
+    T.left = T.set; T.done = false; alarm(false);
+    renderTimer();
+  }
+  function resetTimer() { T.running = false; T.done = false; T.left = T.set; alarm(false); renderTimer(); }
+  const presetBtns = [1, 3, 5, 10].map(function (m) {
+    const b = el('button', 'b', m + '分');
+    b.dataset.v = String(m * 60);
+    b.addEventListener('click', function () { setTimerSet(m * 60); });
+    $('presets').appendChild(b);
+    return b;
+  });
+  $('tMinus').addEventListener('click', function () { setTimerSet(T.set - 60); });
+  $('tPlus').addEventListener('click', function () { setTimerSet(T.set + 60); });
+  $('tReset').addEventListener('click', resetTimer);
+  $('tStart').addEventListener('click', function () {
+    if (T.done) { resetTimer(); return; }
+    if (T.running) { T.left = leftNow(); T.running = false; }
+    else {
+      if (T.left <= 0) T.left = T.set;
+      T.endAt = Date.now() + T.left * 1000;   // 終了時刻で管理するので、描画が止まっても時間はずれない
+      T.running = true;
+    }
+    renderTimer();
+  });
+  function tickTimer() {
+    if (T.running && leftNow() <= 0) {
+      T.running = false; T.left = 0; T.done = true; alarm(true);
+      exitIdle(); touched(); go(1);   // 待機中でもタイマーの画面に戻し、しばらくは待機に入らない
+    }
+    renderTimer();
+  }
+  function renderTimer() {
+    const l = leftNow();
+    const txt = pad(Math.floor(l / 60)) + ':' + pad(l % 60);
+    $('tmText').textContent = txt;
+    $('tmDisp').className = 'disp' + (T.done ? ' on' : (T.running ? '' : ' idle'));
+    $('tmState').textContent = T.done ? 'TIME UP' : (T.running ? 'RUNNING' : (l < T.set && l > 0 ? 'PAUSED' : 'READY'));
+    $('tStart').textContent = T.done ? '停止' : (T.running ? '一時停止' : '開始');
+    presetBtns.forEach(function (b) { b.classList.toggle('on', !T.running && !T.done && T.set === parseInt(b.dataset.v, 10)); });
+    const tab = $('tabTimer');
+    tab.textContent = T.done ? '終了' : (T.running ? txt : 'タイマー');
+    tab.classList.toggle('alert', T.done);
+  }
+  // アラーム中は、画面のどこかを触ると音を止める
+  document.addEventListener('pointerdown', function () { touched(); if (alarmOn) alarm(false); }, true);
+
+  /* ---------- スワイプ / タブ ---------- */
+  let page = 0;
+  const tabEls = Array.prototype.slice.call(document.querySelectorAll('#tabs .tab'));
+  function go(i) {
+    page = Math.max(0, Math.min(4, i));
+    $('track').style.transform = 'translateX(' + (-page * 20) + '%)';
+    tabEls.forEach(function (t, k) { t.classList.toggle('on', k === page); });
+    syncVis();
+    if (page === 2) { try { ovRender(true); if (cfg.googleConfigured && !GG.req && Date.now() - GG.at > 3 * 60 * 1000) fetchGg(); } catch (e) {} }
+  }
+  tabEls.forEach(function (t) { t.addEventListener('click', function () { go(parseInt(t.dataset.i, 10)); }); });
+
+  const vp = $('vp');
+  let sx = null, sy = 0, suppressClick = false;
+  vp.addEventListener('pointerdown', function (e) {
+    if (e.target.closest && e.target.closest('input[type=range], .sk, .volbar')) { sx = null; return; }
+    sx = e.clientX; sy = e.clientY;
+  });
+  // 指（マウス）が枠の外で離れても検出できるよう、離したイベントは window で受ける
+  window.addEventListener('pointerup', function (e) {
+    if (sx == null) return;
+    const dx = e.clientX - sx, dy = e.clientY - sy;
+    sx = null;
+    if (Math.abs(dx) > 50 && Math.abs(dx) > 1.5 * Math.abs(dy)) {
+      suppressClick = true;
+      setTimeout(function () { suppressClick = false; }, 350);
+      cancelHolds();
+      go(page + (dx < 0 ? 1 : -1));
+    } else if (page === 0 && !otOpen && Math.abs(dy) > 45 && Math.abs(dy) > 1.5 * Math.abs(dx)) {
+      suppressClick = true;
+      setTimeout(function () { suppressClick = false; }, 350);
+      cancelHolds();
+      roomGo(roomSub + (dy < 0 ? 1 : -1));
+    }
+  });
+  window.addEventListener('pointercancel', function () { sx = null; });
+  vp.addEventListener('click', function (e) { if (suppressClick) { e.stopPropagation(); e.preventDefault(); } }, true);
+
+  $('gear').addEventListener('click', function () { try { N.openSettings(); } catch (e) {} });
+
+  /* ---------- 天気 ----------
+     Open-Meteo の時間ごとの予報を Kotlin 側で取得し（画面から外部へは出られないため）、
+     毎時0分に「現在の天気」を切り替える。カードには 過去2時間〜先22時間 を表示する。 */
+  const ROW_H = 26;
+  window.__wxI = function (c, n) { return wxIconInner(c, !!n); };   // 確認用
+  const CLOUD = 'M5 18L3 16V13L5 11H7L9 7H14L16 11H18L21 13V16L19 18Z';
+  const MOON = 'M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z';
+  function rays(cx, cy, r1, r2, angles) {
+    let s = '';
+    angles.forEach(function (a) {
+      const t = a * Math.PI / 180, c = Math.cos(t), n = Math.sin(t);
+      s += 'M' + (cx + r1 * c).toFixed(2) + ' ' + (cy + r1 * n).toFixed(2) + 'L' + (cx + r2 * c).toFixed(2) + ' ' + (cy + r2 * n).toFixed(2);
+    });
+    return '<path d="' + s + '"/>';
+  }
+  const SUN = '<circle cx="12" cy="12" r="4"/>' + rays(12, 12, 7, 9.5, [0, 45, 90, 135, 180, 225, 270, 315]);
+  const SUN_S = '<circle cx="9" cy="9" r="3"/>' + rays(9, 9, 5.4, 7.4, [180, 225, 270, 315]);
+  const cloudAt = function (tr) { return '<g transform="' + tr + '"><path class="cl" d="' + CLOUD + '"/></g>'; };
+  const CL_LOW = 'translate(4.2 3.6) scale(.8)', CL_UP = 'translate(1.8 -2.4) scale(.85)';
+  function wxIconInner(code, night) {
+    if (code == null || !isFinite(code)) return '<path d="M8 12h8"/>';
+    if (code === 0 || code === 1) return night ? '<path d="' + MOON + '"/>' : SUN;
+    if (code === 2) return (night ? '<g transform="translate(0 .8) scale(.6)"><path d="' + MOON + '"/></g>' : SUN_S) + cloudAt(CL_LOW);
+    if (code === 3) return cloudAt('translate(0 -1)');
+    if (code === 45 || code === 48) return '<path d="M3 7h18M5 11h14M3 15h16M7 19h12"/>';
+    if (code >= 51 && code <= 57) return cloudAt(CL_UP) + '<path d="M8 17.5v2M12 17.5v2M16 17.5v2M10 20.5v1.5M14 20.5v1.5"/>';
+    if ((code >= 61 && code <= 67) || (code >= 80 && code <= 82)) return cloudAt(CL_UP) + '<path d="M8.5 16l-1.5 4.5M12.5 16l-1.5 4.5M16.5 16l-1.5 4.5"/>';
+    if ((code >= 71 && code <= 77) || code === 85 || code === 86) return cloudAt(CL_UP) + '<path d="M6.5 18h3M8 16.5v3M10.5 21h3M12 19.5v3M14.5 18h3M16 16.5v3"/>';
+    if (code >= 95 && code <= 99) return cloudAt(CL_UP) + '<path d="M13 14l-3.5 4.5H13l-2.5 4.5"/>';
+    return '<path d="M8 12h8"/>';
+  }
+  const isNight = function (t) { const hr = parseInt(t.slice(11, 13), 10); return hr < 6 || hr >= 18; };   // 日の出入りは使わず、18〜6時を夜として扱う
+
+  let wx = null;          // 最後に取得できたデータ { rows, off(UTC差・秒), at(取得時刻) }
+  let wxErr = null, wxReq = null, wxRetry = null, wxKey = '', wxShown = '';
+  function wxCfgKey() { return cfg.lat + '|' + cfg.lon + '|' + cfg.model; }
+  function wxNowKey(off) {
+    const d = new Date(Date.now() + off * 1000);
+    return d.getUTCFullYear() + '-' + pad(d.getUTCMonth() + 1) + '-' + pad(d.getUTCDate()) + 'T' + pad(d.getUTCHours()) + ':00';
+  }
+  function parseWx(body) {
+    const j = JSON.parse(body), hr = j.hourly;
+    if (!hr || !Array.isArray(hr.time)) throw new Error('no hourly');
+    const code = hr.weather_code || hr.weathercode || [];
+    const u = (j.hourly_units && j.hourly_units.wind_speed_10m) || 'km/h';
+    const k = /km\/h/i.test(u) ? 1 / 3.6 : 1;     // 表示は m/s。API の既定は km/h
+    const num = function (a, i) { const v = a && a[i]; return typeof v === 'number' && isFinite(v) ? v : null; };
+    const rows = [];
+    hr.time.forEach(function (t, i) {
+      if (!/^\d{4}-\d\d-\d\dT\d\d:\d\d$/.test(t)) return;
+      const w = num(hr.wind_speed_10m, i);
+      rows.push({ t: t, code: num(code, i), temp: num(hr.temperature_2m, i), pr: num(hr.precipitation, i),
+                  wind: w == null ? null : w * k, hum: num(hr.relative_humidity_2m, i) });
+    });
+    if (!rows.length) throw new Error('empty');
+    return { rows: rows, off: typeof j.utc_offset_seconds === 'number' ? j.utc_offset_seconds : -new Date().getTimezoneOffset() * 60, at: Date.now() };
+  }
+  function fetchWx() {
+    clearTimeout(wxRetry);
+    wxKey = wxCfgKey();
+    const id = 'w' + (++seq);
+    wxReq = id;
+    renderWxStatus();
+    try { N.fetchWeather(id); } catch (e) { window.onWeatherResult(id, false, '天気の取得に対応していません'); }
+  }
+  window.onWeatherResult = function (id, ok, msg, body) {
+    if (id !== wxReq) return;
+    wxReq = null;
+    if (ok) { try { wx = parseWx(body); wxErr = null; } catch (e) { ok = false; msg = 'データを読み取れませんでした'; } }
+    if (!ok) { wxErr = msg || '取得に失敗しました'; clearTimeout(wxRetry); wxRetry = setTimeout(fetchWx, 60000); }
+    renderWx();
+  };
+  function renderWxStatus() {
+    const hm = function (ms) { const d = new Date(ms); return pad(d.getHours()) + ':' + pad(d.getMinutes()); };
+    let ph, txt;
+    if (wxReq && !wx) { ph = 'unsent'; txt = '取得中…'; }
+    else if (wxErr) { ph = 'off'; txt = wx ? '更新失敗 · ' + hm(wx.at) : '取得失敗'; }
+    else if (wx) { ph = 'on'; txt = hm(wx.at) + ' 更新'; }
+    else { ph = 'unsent'; txt = '未取得'; }
+    $('wxDot').className = 'dot ' + ph;
+    $('wxSum').textContent = txt;
+    const la = parseFloat(cfg.lat), lo = parseFloat(cfg.lon);
+    $('wxMeta').textContent = (cfg.model || 'auto') + ' · ' + (isFinite(la) ? la.toFixed(2) : '?') + ',' + (isFinite(lo) ? lo.toFixed(2) : '?');
+  }
+  const fx = function (v, d) { return v == null ? '–' : v.toFixed(d); };
+  function renderWx() {
+    renderWxStatus();
+    const list = $('wxList');
+    let idx = -1;
+    const key = wx ? wxNowKey(wx.off) : '';
+    if (wx) idx = wx.rows.findIndex(function (r) { return r.t === key; });
+    const cur = idx >= 0 ? wx.rows[idx] : null;
+    // 時計の近く: シンボルと気温だけ
+    const wIco = wxIconInner(cur ? cur.code : null, cur ? isNight(cur.t) : false);
+    const wTxt = cur && cur.temp != null ? Math.round(cur.temp) + '°' : '--°';
+    document.querySelectorAll('.wx-i').forEach(function (e) { e.innerHTML = wIco; });
+    document.querySelectorAll('.wx-t').forEach(function (e) { e.textContent = wTxt; });
+    // カード: 過去2時間〜先22時間
+    const st = list.scrollTop;
+    if (!cur) {
+      list.innerHTML = '<div class="wxempty">' + (wx ? '現在の時刻のデータがありません' : (wxErr ? '天気を取得できません<br>' + String(wxErr).replace(/[<>&]/g, '') : '取得中…')) + '</div>';
+      list.style.display = 'flex'; wxShown = ''; return;
+    }
+    list.style.display = '';
+    let html = '', lastDay = '';
+    for (let i = Math.max(0, idx - 2); i <= Math.min(wx.rows.length - 1, idx + 22); i++) {
+      const r = wx.rows[i], day = r.t.slice(0, 10);
+      if (lastDay && day !== lastDay) {
+        const d = new Date(Date.UTC(+day.slice(0, 4), +day.slice(5, 7) - 1, +day.slice(8, 10)));
+        html += '<div class="wxday">' + day.slice(5, 7) + '/' + day.slice(8, 10) + ' ' + WJP[d.getUTCDay()] + '</div>';
+      }
+      lastDay = day;
+      html += '<div class="wxr' + (i < idx ? ' past' : i === idx ? ' cur' : '') + '"><span class="tm">' + r.t.slice(11, 16) + '</span>' +
+        '<span><svg class="wx-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true">' + wxIconInner(r.code, isNight(r.t)) + '</svg></span>' +
+        '<span class="n">' + fx(r.temp, 1) + '</span><span class="n">' + fx(r.pr, 1) + '</span><span class="n">' + fx(r.wind, 1) + '</span><span class="n">' + (r.hum == null ? '–' : Math.round(r.hum)) + '</span></div>';
+    }
+    list.innerHTML = html;
+    // 毎時、表示が1行ずれるので、スクロール位置も1行分追従させる
+    list.scrollTop = wxShown && wxShown !== key ? Math.max(0, st - ROW_H) : st;
+    wxShown = key;
+  }
+  let wxHourKey = '';
+  function wxTick() {                       // 毎時0分に表示を切り替え、少し後に最新を取り直す
+    const d = new Date(Date.now()), k = d.getFullYear() + '-' + d.getMonth() + '-' + d.getDate() + '-' + d.getHours();
+    if (wxHourKey && k !== wxHourKey) { renderWx(); setTimeout(fetchWx, 3000); }
+    wxHourKey = k;
+  }
+  $('wxNow').addEventListener('click', function () { go(3); });
+
+  /* ---------- 概要 ----------
+     日付（常に今日）／降水量（いまの時刻から12時間）／予定とTODO（15:00〜24:00は翌日、それ以外は当日）／その日の最高・最低気温。
+     予定・TODO は Kotlin 側が Google から取得する（今日と明日の分をまとめて）。 */
+  const GG = { data: null, at: 0, err: null, req: null, key: '', retry: null };
+  function ggCfgKey() { return String(!!cfg.googleConfigured) + '|' + String(!!cfg.taskUndated); }
+  const ymdOf = function (d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); };
+  function fetchGg() {
+    clearTimeout(GG.retry); GG.retry = null;
+    GG.key = ggCfgKey();
+    if (!cfg.googleConfigured) { GG.data = null; GG.err = null; ovRender(true); return; }
+    const n = new Date(), d0 = new Date(n.getFullYear(), n.getMonth(), n.getDate()), d2 = new Date(n.getFullYear(), n.getMonth(), n.getDate() + 2);
+    const iso = function (d) { return d.toISOString().slice(0, 19) + 'Z'; };
+    const id = 'g' + (++seq);
+    GG.req = id;
+    try { N.fetchGoogle(id, iso(d0), iso(d2)); } catch (e) { window.onGoogleResult(id, false, 'Googleの取得に対応していません'); }
+  }
+  window.onGoogleResult = function (id, ok, msg, body) {
+    if (id !== GG.req) return;
+    GG.req = null;
+    if (ok) { try { GG.data = JSON.parse(body); GG.err = null; GG.at = Date.now(); GG.day = ymdOf(new Date()); GG.retry = null; } catch (e) { ok = false; msg = 'データを読み取れませんでした'; } }
+    if (!ok) { GG.err = msg || '取得に失敗しました'; clearTimeout(GG.retry); GG.retry = setTimeout(fetchGg, 60000); }
+    ovRender(true);
+  };
+  const esc = function (t) { return String(t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+
+  function ovItems(target) {          // target: その日の 0:00 の Date
+    const dayS = target.getTime(), dayE = new Date(target.getFullYear(), target.getMonth(), target.getDate() + 1).getTime();
+    const ymd = ymdOf(target), today = ymdOf(new Date());
+    const ev = [], td = [];
+    ((GG.data && GG.data.events) || []).forEach(function (e) {
+      if (e.allDay) {
+        if (e.start <= ymd && ymd < (e.end || e.start)) ev.push({ k: 0, o: 0, t: '終日', x: e.title });
+        return;
+      }
+      const st = new Date(e.start).getTime(), en = e.end ? new Date(e.end).getTime() : st;
+      if (!isFinite(st) || st >= dayE || (en <= dayS && st < dayS)) return;
+      ev.push(st >= dayS ? { k: 1, o: st, t: hmOf(st), x: e.title } : { k: 0, o: 1, t: '継続', x: e.title });
+    });
+    ev.sort(function (a, b) { return a.k - b.k || a.o - b.o; });
+    ((GG.data && GG.data.tasks) || []).forEach(function (t) {
+      if (t.due) {
+        if (t.due === ymd) td.push({ o: 1, t: '--:--', x: t.title });
+        else if (t.due < today) td.push({ o: 0, t: '超過', x: t.title });
+      } else if (GG.data.undated) td.push({ o: 2, t: '--:--', x: t.title });
+    });
+    td.sort(function (a, b) { return a.o - b.o; });
+    return ev.map(function (e) { return { ev: true, t: e.t, x: e.x }; }).concat(td.map(function (e) { return { ev: false, t: e.t, x: e.x }; }));
+  }
+  function ovRainSvg() {
+    const W = 176, H = 96, L = 22, B = 20, T = 6;
+    if (!wx) return '<div class="ovmsg" style="width:100%">' + (wxErr ? '天気を取得できません' : '取得中…') + '</div>';
+    const idx = wx.rows.findIndex(function (r) { return r.t === wxNowKey(wx.off); });
+    if (idx < 0) return '<div class="ovmsg" style="width:100%">データがありません</div>';
+    const rows = [];
+    for (let i = 0; i < 12; i++) rows.push(wx.rows[idx + i] || null);
+    const vals = rows.map(function (r) { return r && r.pr != null ? r.pr : 0; });
+    const mx = Math.max(5, Math.ceil(Math.max.apply(null, vals) / 5) * 5);
+    const bw = (W - L) / 12;
+    let h = '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" style="overflow:visible" aria-label="降水量">';
+    [0, mx / 2, mx].forEach(function (v) {
+      const y = H - B - (H - B - T) * v / mx;
+      h += '<line x1="' + L + '" x2="' + W + '" y1="' + y + '" y2="' + y + '" stroke="#3a3a3a" stroke-width="1"/><text x="' + (L - 4) + '" y="' + (y + 3) + '" text-anchor="end" fill="#9a9a9a" font-size="8" font-family="Share Tech Mono">' + v + '</text>';
+    });
+    vals.forEach(function (v, i) {
+      const bh = v > 0 ? Math.max(1.5, (H - B - T) * Math.min(v, mx) / mx) : 1;
+      h += '<rect x="' + (L + i * bw + 2) + '" y="' + (H - B - bh) + '" width="' + (bw - 4) + '" height="' + bh + '" fill="' + (v >= mx / 2 ? '#ececec' : '#8a8a8a') + '"/>';
+    });
+    [[0, 'start'], [8, 'middle']].forEach(function (p) {
+      const r = rows[p[0]]; if (!r) return;
+      const x = L + p[0] * bw + 2, lab = (p[0] ? '+8h ' : '') + r.t.slice(11, 13) + '時';
+      h += '<line x1="' + x + '" x2="' + x + '" y1="' + (H - B) + '" y2="' + (H - B + 4) + '" stroke="#ececec"/><text x="' + x + '" y="' + (H - 3) + '" fill="#ececec" font-size="9" font-family="Share Tech Mono" text-anchor="' + p[1] + '">' + lab + '</text>';
+    });
+    return h + '</svg>';
+  }
+  function ovHiLo(target) {            // 目標の日の最高・最低気温（天気データの現地の日付で集計）
+    if (!wx) return '';
+    const d = new Date(Date.now() + wx.off * 1000 + (target.tomorrow ? 86400000 : 0));
+    const key = d.getUTCFullYear() + '-' + pad(d.getUTCMonth() + 1) + '-' + pad(d.getUTCDate());
+    const v = wx.rows.filter(function (r) { return r.t.slice(0, 10) === key && r.temp != null; }).map(function (r) { return r.temp; });
+    if (!v.length) return '';
+    return '<em>最高</em>' + Math.round(Math.max.apply(null, v)) + '°<em>最低</em>' + Math.round(Math.min.apply(null, v)) + '°';
+  }
+  let ovKey = '';
+  function ovRender(force) {
+    const n = new Date(), tom = n.getHours() >= 15;
+    const tgt = new Date(n.getFullYear(), n.getMonth(), n.getDate() + (tom ? 1 : 0));
+    const key = [ymdOf(n), tom, n.getHours(), GG.at, GG.err, !!GG.req, wx && wx.at, wxErr, cfg.googleConfigured].join('|');
+    const mm = pad(n.getHours()) + ':' + pad(n.getMinutes()) + ' 現在';
+    if ($('ovNow').textContent !== mm) $('ovNow').textContent = mm;
+    if (!force && key === ovKey) return;
+    ovKey = key;
+    $('ovMo').textContent = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'][n.getMonth()] + ' ' + n.getFullYear();
+    $('ovDd').textContent = String(n.getDate());
+    $('ovWj').textContent = WJP[n.getDay()];
+    $('ovWe').textContent = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'][n.getDay()];
+    $('ovRain').innerHTML = ovRainSvg();
+    $('ovDay').textContent = (tom ? '明日 ' : '今日 ') + (tgt.getMonth() + 1) + '/' + tgt.getDate() + '（' + WJP[tgt.getDay()] + '）';
+    $('ovHl').innerHTML = ovHiLo({ tomorrow: tom });
+    const list = $('ovList');
+    let html = '';
+    if (!cfg.googleConfigured) html = '<div class="ovmsg">Googleカレンダー／ToDoが未設定です<br>（設定画面 → Google）</div>';
+    else if (!GG.data) html = '<div class="ovmsg">' + (GG.err ? 'Googleから取得できません<br>' + esc(GG.err) : '取得中…') + '</div>';
+    else {
+      const items = ovItems(tgt);
+      html = items.map(function (it) {
+        return '<div class="ovit' + (it.ev ? '' : ' todo') + '"><span class="t">' + esc(it.t) + '</span><i class="g' + (it.ev ? ' ev' : '') + '"></i><span class="x">' + esc(it.x) + '</span></div>';
+      }).join('');
+      if (!items.length) html = '<div class="ovmsg">予定・TODOはありません</div>';
+      const warn = (GG.data.errCal ? 'カレンダー: ' + GG.data.errCal : '') + (GG.data.errTask ? (GG.data.errCal ? ' / ' : '') + 'ToDo: ' + GG.data.errTask : '');
+      if (warn) html += '<div class="ovmsg" style="height:auto;padding:6px 0">' + esc(warn) + '</div>';
+    }
+    list.innerHTML = html;
+    ovScroll();
+  }
+  function ovScroll() {
+    const l = $('ovList'), w = $('ovLw'), room = l.scrollHeight - l.clientHeight;
+    w.classList.toggle('fit', room <= 2);
+    w.classList.toggle('more', room > 2 && l.scrollTop < room - 2);
+    if (room > 2) {
+      const th = Math.max(14, l.clientHeight / l.scrollHeight * 100);
+      $('ovThumb').style.height = th + '%';
+      $('ovThumb').style.top = (l.scrollTop / room * (100 - th)) + '%';
+    }
+  }
+  $('ovList').addEventListener('scroll', ovScroll);
+  function ovTick() {                    // 約0.25秒ごと。表示が変わるときだけ描き直す
+    ovRender(false);
+    const n = Date.now();
+    if (cfg.googleConfigured && !GG.req && (!GG.at || n - GG.at > 10 * 60 * 1000 || GG.day !== ymdOf(new Date())) && !GG.retry) fetchGg();
+  }
+
+  /* ---------- PC連携 ----------
+     PC（Windows）で動かす小さなプログラムと、USB経由(adb reverse)で通信する。通信は Kotlin 側。
+     ・約2秒ごとにPCの状態を取得（6.5秒以上取れなければ「未接続」）
+     ・VIS: PC側の Cava が出す棒グラフの値を、約30fpsで受け取って描く */
+  const pcReqs = {};
+  let pc = { data: null, at: 0, err: null }, pcBusyAt = 0, pcLastConn = null, visSent = null, visAt = 0, visLoud = 0, visRaf = 0, nBars = 32, barsLive = [];
+  function pcCall(method, path, body, cb) {
+    const id = 'p' + (++seq);
+    pcReqs[id] = cb;
+    try { N.pcRequest(id, method, path, body || ''); } catch (e) { delete pcReqs[id]; cb(false, '未対応'); }
+  }
+  window.onPcResult = function (id, ok, msg, body) { const cb = pcReqs[id]; delete pcReqs[id]; if (cb) cb(ok, msg, body); };
+  const pcConnected = function () { return !!pc.data && Date.now() - pc.at < 6500; };
+  const qsc = {};
+  function qs(c) { return qsc[c] || (qsc[c] = Array.prototype.slice.call(document.querySelectorAll('.' + c))); }
+  function setT(c, t) { qs(c).forEach(function (e) { if (e.textContent !== t) e.textContent = t; }); }
+  function setW(c, p) { qs(c).forEach(function (e) { e.style.width = Math.max(0, Math.min(100, p)) + '%'; }); }
+  const mmss = function (s) { s = Math.max(0, Math.floor(s)); return Math.floor(s / 60) + ':' + pad(s % 60); };
+  const fnum = function (v, d) { return v == null ? '--' : (+v).toFixed(d); };
+  const PLAY_SVG = '<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><path d="M7 4v16l13-8z"/></svg>';
+  const PAUSE_SVG = '<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>';
+
+  function pcPoll() {
+    if (!cfg.pcConfigured) return;
+    if (pcBusyAt && Date.now() - pcBusyAt < 8000) return;
+    pcBusyAt = Date.now();
+    pcCall('GET', '/status', '', function (ok, msg, body) {
+      pcBusyAt = 0;
+      if (ok) { try { pc.data = JSON.parse(body); pc.at = Date.now(); pc.err = null; } catch (e) { ok = false; msg = '応答を読み取れません'; } }
+      if (!ok) pc.err = msg || '未接続';
+      renderPc(); pcCheckConn();
+    });
+  }
+  function pcCheckConn() {
+    const c = pcConnected();
+    if (c !== pcLastConn) { pcLastConn = c; renderPc(); syncVis(); if (idle) applyIdleMode(); }
+  }
+  function setNp(title, artist) {
+    qs('pc-np').forEach(function (e) {
+      e.textContent = title || '再生中のメディアなし';
+      if (title && artist) { const em = document.createElement('em'); em.textContent = artist; e.appendChild(em); }
+    });
+    setT('pc-np2', title ? (artist ? title + ' — ' + artist : title) : '--');
+    document.querySelectorAll('.np').forEach(function (e) { e.classList.toggle('none', !title); });
+  }
+  let lastEst = { k: '', v: 0 };
+  let pcMedia = null, seekDrag = null, seekHold = null, volDrag = null, volHold = null, volSentAt = 0;
+  function renderPcTime() {
+    const m = pcMedia;
+    if (m && m.dur > 0) {
+      let est;
+      if (seekDrag) est = seekDrag.f * m.dur;
+      else if (seekHold && Date.now() < seekHold.until) est = Math.min(m.dur, seekHold.pos + (m.playing ? (Date.now() - seekHold.t) / 1000 : 0));
+      else {
+        est = Math.min(m.dur, (m.pos || 0) + (m.playing ? (Date.now() - pc.at) / 1000 : 0));
+        if (m.playing && lastEst.k === m.title && est < lastEst.v && lastEst.v - est < 1.5) est = lastEst.v;   // 更新のたびに少し戻って見えるのを防ぐ
+      }
+      lastEst = { k: m.title, v: est };
+      setT('pc-tm', mmss(est) + ' / ' + mmss(m.dur));
+      setW('pc-pg', est / m.dur * 100);
+    } else { setT('pc-tm', ''); setW('pc-pg', 0); }
+  }
+  function renderPc() {
+    const conn = pcConnected(), d = conn ? pc.data : null;
+    $('cPc').classList.toggle('off', !conn);
+    qs('pc-dot').forEach(function (e) { e.className = 'dot pc-dot ' + (conn ? 'on' : 'unsent'); });
+    setT('pc-sum', !cfg.pcConfigured ? '未設定' : (conn ? '接続中 · USB' : '未接続'));
+    setT('pc-cpu', d ? fnum(d.cpu, 0) : '--'); setW('pcb-cpu', d && d.cpu != null ? d.cpu : 0);
+    setT('pc-cpuS', d && d.cpu_ghz != null ? fnum(d.cpu_ghz, 1) + ' GHz' : '—');
+    setT('pc-mem', d ? fnum(d.mem, 0) : '--'); setW('pcb-mem', d && d.mem != null ? d.mem : 0);
+    setT('pc-memS', d && d.mem_used_gb != null ? fnum(d.mem_used_gb, 1) + ' / ' + fnum(d.mem_total_gb, 0) + ' GB' : '—');
+    setT('pc-gpu', d ? fnum(d.gpu, 0) : '--'); setW('pcb-gpu', d && d.gpu != null ? d.gpu : 0);
+    setT('pc-gpuS', d && d.gpu_temp != null ? Math.round(d.gpu_temp) + ' °C' : '—');
+    setT('pc-net', d ? fnum(d.net_down, 1) : '--');
+    setW('pcb-net', d && d.net_down != null ? Math.log10(1 + d.net_down) / Math.log10(126) * 100 : 0);   // 0〜125MB/s を対数で
+    setT('pc-netS', d && d.net_up != null ? '↑ ' + fnum(d.net_up, 1) + ' MB/s' : '—');
+    const m = d && d.media && d.media.available && d.media.title ? d.media : null;
+    pcMedia = m;
+    setNp(m ? m.title : null, m ? m.artist : null);
+    const pl = $('mPlay'), playing = !!(m && m.playing);
+    pl.innerHTML = playing ? PAUSE_SVG : PLAY_SVG;
+    pl.classList.toggle('on', playing);
+    pl.setAttribute('aria-label', playing ? '一時停止' : '再生');
+    ['mPrev', 'mPlay', 'mNext'].forEach(function (id) { $(id).disabled = !m; });
+    ['vDn', 'vUp', 'vMute'].forEach(function (id) { $(id).disabled = !conn; });
+    renderVol();
+    renderPcTime();
+    $('mSeek').classList.toggle('lock', !(conn && m && m.dur > 0));
+  }
+  function renderVol() {
+    const d = pcConnected() ? pc.data : null;
+    let vol = d && d.volume != null ? d.volume : null, muted = !!(d && d.muted);
+    if (vol != null && volDrag != null) { vol = volDrag; muted = false; }
+    else if (vol != null && volHold && Date.now() < volHold.until) { vol = volHold.lvl; muted = false; }
+    setT('pc-vol', vol == null ? '--' : (muted ? 'MUTE' : String(vol)));
+    setW('pc-volbar', vol != null && !muted ? vol : 0);
+    $('vMute').textContent = muted ? '解除' : 'ミュート';
+    $('volBar').classList.toggle('lock', vol == null);
+  }
+  /* シークバー: 押す・ドラッグで 再生位置 / 音量 を指定する（離したときに確定。音量はドラッグ中も少しずつ反映） */
+  function bindDrag(el, enabled, onMove, onEnd) {
+    let on = false;
+    const frac = function (e) { const r = el.getBoundingClientRect(); return Math.max(0, Math.min(1, (e.clientX - r.left) / Math.max(1, r.width))); };
+    el.addEventListener('pointerdown', function (e) {
+      if (!enabled()) return;
+      on = true; el.classList.add('drag');
+      try { el.setPointerCapture(e.pointerId); } catch (x) {}
+      e.preventDefault();
+      onMove(frac(e));
+    });
+    el.addEventListener('pointermove', function (e) { if (on) onMove(frac(e)); });
+    el.addEventListener('pointerup', function (e) { if (!on) return; on = false; el.classList.remove('drag'); onEnd(frac(e)); });
+    el.addEventListener('pointercancel', function () { if (!on) return; on = false; el.classList.remove('drag'); onEnd(null); });
+  }
+  bindDrag($('mSeek'), function () { return !!(pcMedia && pcMedia.dur > 0 && pcConnected()); },
+    function (f) { seekDrag = { f: f }; renderPcTime(); },
+    function (f) {
+      seekDrag = null;
+      if (f == null || !pcMedia) { renderPcTime(); return; }
+      const pos = Math.round(f * pcMedia.dur * 10) / 10;
+      seekHold = { pos: pos, t: Date.now(), until: Date.now() + 2500 };
+      renderPcTime();
+      pcCall('POST', '/media', JSON.stringify({ action: 'seek', pos: pos }), function (ok, msg) {
+        if (!ok) { seekHold = null; toast(false, msg || '再生位置を変更できませんでした'); renderPcTime(); }
+        setTimeout(pcPoll, 700);
+      });
+    });
+  function sendVol(l) {
+    pcCall('POST', '/volume', JSON.stringify({ action: 'set', level: l }), function (ok, msg) {
+      if (!ok) { volHold = null; toast(false, msg || '音量を変更できませんでした'); renderVol(); }
+    });
+  }
+  bindDrag($('volBar'), function () { return pcConnected() && !!pc.data && pc.data.volume != null; },
+    function (f) {
+      volDrag = Math.round(f * 100); renderVol();
+      const now = Date.now();
+      if (now - volSentAt > 120) { volSentAt = now; sendVol(volDrag); }
+    },
+    function (f) {
+      volDrag = null;
+      if (f == null) { renderVol(); return; }
+      const l = Math.round(f * 100);
+      volHold = { lvl: l, until: Date.now() + 2000 };
+      renderVol(); sendVol(l);
+      setTimeout(pcPoll, 700);
+    });
+  function pcCmd(path, action) {
+    pcCall('POST', path, JSON.stringify({ action: action }), function (ok) {
+      if (!ok) toast(false, 'PCに送れませんでした');
+      setTimeout(pcPoll, 400);
+    });
+  }
+  $('mPrev').addEventListener('click', function () { pcCmd('/media', 'prev'); });
+  $('mPlay').addEventListener('click', function () { pcCmd('/media', 'playpause'); });
+  $('mNext').addEventListener('click', function () { pcCmd('/media', 'next'); });
+  $('vDn').addEventListener('click', function () { pcCmd('/volume', 'down'); });
+  $('vUp').addEventListener('click', function () { pcCmd('/volume', 'up'); });
+  $('vMute').addEventListener('click', function () { pcCmd('/volume', 'mute'); });
+
+  /* ビジュアライザー（VIS）
+     PC側(Cava)から届く値(0〜1000)を、画面側で60fpsに補完して描く（設定「補完」。切ると届いた値をそのまま表示）。
+     ピークホールド（設定）: 各棒の最高点に細い線を残し、少し待ってから落とす。 */
+  let barEls = { a: [], b: [], c: [] }, vis = { tgt: [], cur: [], pk: [], pkT: [], pkV: [] }, visLast = 0;
+  function buildBars(n) {
+    nBars = n;
+    const html = new Array(n + 1).join('<i><s></s><b></b></i>');
+    ['bars', 'bars2', 'bars3'].forEach(function (id) { $(id).innerHTML = html; });
+    barEls = { a: $('bars').children, b: $('bars2').children, c: $('bars3').children };
+    const z = function () { return new Array(n).fill(0); };
+    vis = { tgt: z(), cur: z(), pk: z(), pkT: z(), pkV: z() };
+  }
+  buildBars(32);
+  function visTarget() { if (!idle) return page === 4 && visOn ? 'a' : null; const m = idleMode(); return m === 'v' ? 'b' : (m === 'w' ? 'c' : null); }
+  function drawVis(t) {
+    visRaf = 0;
+    const k = visTarget();
+    if (!k) return;                                   // 見えていない間は止める
+    const els = barEls[k], n = els.length, now = t || performance.now();
+    const dt = Math.min(0.05, Math.max(0.001, (now - visLast) / 1000));
+    visLast = now;
+    const H = n ? els[0].clientHeight : 0, stale = Date.now() - visAt > 1500;
+    const smooth = cfg.visSmooth !== false, peak = !!cfg.visPeak;
+    const ar = 1 - Math.exp(-dt / 0.035), af = 1 - Math.exp(-dt / 0.09);   // 上がりは速く、下がりはなだらかに
+    let moving = false;
+    for (let i = 0; i < n; i++) {
+      const tg = stale ? 0 : (vis.tgt[i] || 0);
+      let c = vis.cur[i] || 0;
+      if (smooth) { c += (tg - c) * (tg > c ? ar : af); if (Math.abs(c - tg) < 0.15) c = tg; } else c = tg;
+      vis.cur[i] = c;
+      if (c !== tg) moving = true;
+      els[i].firstChild.style.transform = 'scaleY(' + Math.max(H ? 2 / H : 0.02, c / 100).toFixed(4) + ')';
+      if (peak) {
+        let p = vis.pk[i] || 0;
+        if (c >= p) { p = c; vis.pkT[i] = now; vis.pkV[i] = 0; }
+        else if (now - vis.pkT[i] > 650) { vis.pkV[i] += 260 * dt; p = Math.max(c, p - vis.pkV[i] * dt); }   // 650ms保持 → だんだん加速して落ちる
+        vis.pk[i] = p;
+        if (p > c) moving = true;
+        els[i].lastChild.style.transform = 'translateY(' + (-Math.max(2, p / 100 * H)).toFixed(1) + 'px)';
+      } else vis.pk[i] = c;
+    }
+    if (moving || Date.now() - visAt < 4000) visRaf = requestAnimationFrame(drawVis);
+  }
+  function visKick() { if (!visRaf) { visLast = performance.now(); visRaf = requestAnimationFrame(drawVis); } }
+  window.onVis = function (line) {
+    const a = String(line).split(';');
+    if (a.length < 2 || a.length > 128) return;
+    if (a.length !== nBars) buildBars(a.length);
+    let mx = 0;
+    for (let i = 0; i < a.length; i++) { const v = Math.max(0, Math.min(1000, parseInt(a[i], 10) || 0)) / 10; vis.tgt[i] = v; if (v > mx) mx = v; }
+    visAt = Date.now();
+    if (mx >= 3) visLoud = visAt;
+    visKick();
+  };
+  const SILENT_TO_INFO_MS = 10000;      // VIS待機で、この時間 音が出ていなければ PC情報の待機画面に切り替える（音が出れば戻る）
+  function idleBase() { return pcConnected() ? (visOn ? 'v' : 'i') : 'b'; }                  // b: 基本 / i: PC情報 / v: VIS
+  function visSilent() { const n = Date.now(); return n - visLoud > SILENT_TO_INFO_MS || n - visAt > 3000; }
+  function idleMode() {                                                                       // b / i / v(VIS1) / w(VIS2)
+    const m = idleBase();
+    if (m !== 'v') return m;
+    return visSilent() ? 'i' : (cfg.visLayout === 2 ? 'w' : 'v');
+  }
+  let curMode = '', swapT = null;
+  const MODE_CLS = { i: 'pcmode', v: 'vmode', w: 'wmode', b: '' };
+  function setModeCls(m) {
+    const e = $('idle');
+    ['pcmode', 'vmode', 'wmode'].forEach(function (c) { e.classList.toggle(c, MODE_CLS[m] === c); });
+  }
+  function applyIdleMode(now) {                                  // now=true: 切り替えを即時に（待機に入る瞬間）
+    const m = idleMode(), e = $('idle');
+    if (m === curMode) return;
+    curMode = m;
+    clearTimeout(swapT);
+    if (now || !idle) { e.classList.remove('swp'); setModeCls(m); return; }
+    e.classList.add('swp');                                      // いったん消えてから切り替わる
+    swapT = setTimeout(function () { setModeCls(curMode); e.classList.remove('swp'); }, 380);
+  }
+  function visWanted() { return visOn && cfg.pcConfigured && (idle ? idleBase() === 'v' : page === 4); }
+  function syncVis() {
+    const w = visWanted();
+    visKick();
+    if (w !== visSent) {
+      visSent = w;
+      if (w) { visLoud = visAt = Date.now(); }   // 受信を始めた直後は音が出ている扱い（無音の判定は、そこから10秒後）
+      try { N.pcVis(w); } catch (e) {}
+    }
+  }
+  function applyVisUi() {
+    visKick();
+    $('cPc').classList.toggle('vm', visOn);
+    $('vBtn').classList.toggle('on', visOn);
+  }
+  $('vBtn').addEventListener('click', function () { visOn = !visOn; saveState(); applyVisUi(); syncVis(); });
+  function pcTick() {                        // 毎秒
+    pcCheckConn();
+    renderPcTime();
+    const now = Date.now();
+    const q = now - visLoud > 8000 || now - visAt > 3000;   // 無音のときは棒を消す（焼き付き防止）
+    qs('bars2').forEach(function (e) { e.classList.toggle('quiet', q); });
+  }
+  // 待機画面（PC接続時）の表示は、一定周期で数十pxずらす
+  const PC_SHIFT_MS = 30000;
+  let shiftTimer = null, sj = { x: 0, y: 0 };
+  function shiftPc() {
+    let nx, ny, k = 0;
+    do { nx = Math.round((Math.random() * 2 - 1) * 24); ny = Math.round((Math.random() * 2 - 1) * 20); k++; }
+    while (k < 8 && Math.hypot(nx - sj.x, ny - sj.y) < 14);
+    sj = { x: nx, y: ny };
+    ['pcwI', 'pcwV', 'pcwW', 'idleBlock'].forEach(function (id) { const e = $(id); e.style.setProperty('--jx', nx + 'px'); e.style.setProperty('--jy', ny + 'px'); });
+  }
+
+  /* ---------- 待機画面 ----------
+     無操作が続くと、黒背景に「時計とエアコン設定の概要」だけを出す。
+     有機ELの焼き付き防止のため、表示を一定間隔で数十pxずつ、ゆっくりずらす。
+     待機中に画面を触ると操作画面へ戻る（その1回のタップでボタンは押されない）。 */
+  // 待機画面へ移るまでの無操作時間は設定画面で変更（cfg.idleSec 秒。0なら自動では待機しない）
+  const rootEl = document.documentElement;
+  let idle = false, lastTouch = Date.now();
+  function touched() { lastTouch = Date.now(); }
+
+  function renderIdle() {
+    const d = new Date();
+    setT('i-time', pad(d.getHours()) + ':' + pad(d.getMinutes()));
+    setT('i-sec', pad(d.getSeconds()));
+    setT('i-date', d.getFullYear() + '.' + pad(d.getMonth() + 1) + '.' + pad(d.getDate()) + ' ' + WEN[d.getDay()]);
+    const ph = acPhase();
+    qs('i-dot').forEach(function (e) { e.className = 'dot ' + ph + ' i-dot'; });
+    setT('i-ac', PHASE[ph] + '  ' + fmtTemp(ac.temperature, ac.mode) + '  ' + ac.mode + '  風' + ac.fan);
+    const vis = T.running ? 'visible' : 'hidden';   // タイマー動作中だけ残り時間を出す
+    qs('i-timerrow').forEach(function (e) { e.style.visibility = vis; });
+    const l = leftNow();
+    setT('i-timer', pad(Math.floor(l / 60)) + ':' + pad(l % 60));
+    applyIdleMode();
+  }
+  function enterIdle() {
+    if (idle) return;
+    idle = true;
+    cancelHolds();
+    curMode = '';
+    applyIdleMode(true);
+    renderIdle();
+    rootEl.classList.add('idle');
+    shiftPc(); clearInterval(shiftTimer); shiftTimer = setInterval(shiftPc, PC_SHIFT_MS);
+    syncVis();
+  }
+  function exitIdle() {
+    if (!idle) return;
+    idle = false;
+    clearInterval(shiftTimer);
+    clearTimeout(swapT);
+    $('idle').classList.remove('swp');
+    rootEl.classList.remove('idle');
+    touched();
+    syncVis();
+  }
+  $('idle').addEventListener('pointerdown', function (e) { e.preventDefault(); e.stopPropagation(); exitIdle(); });
+  $('idleBtn').addEventListener('click', enterIdle);
+
+  /* ---------- 画面サイズに合わせて拡縮 ---------- */
+  function fit() {
+    const s = Math.min(window.innerWidth / 740, window.innerHeight / 360);
+    const x = (window.innerWidth - 740 * s) / 2, y = (window.innerHeight - 360 * s) / 2;
+    $('stage').style.transform = 'translate(' + x + 'px,' + y + 'px) scale(' + s + ')';
+  }
+  window.addEventListener('resize', fit);
+
+  function renderAll() { renderAc(); renderLight(); renderTimer(); renderWx(); renderPc(); ovRender(true); }
+  loadCfg();
+  renderAll();
+  go(0);
+  fit();
+  updateClock();
+  wxTick();
+  fetchWx();
+  applyVisUi();
+  pcPoll();
+  setInterval(pcPoll, 2000);
+  setInterval(pcTick, 1000);
+  setInterval(function () {
+    updateClock();
+    tickTimer();
+    tickOt();
+    ovTick();
+    wxTick();
+    if (idle) renderIdle();
+    else if (cfg.idleSec > 0 && Date.now() - lastTouch > cfg.idleSec * 1000) enterIdle();
+  }, 250);
+})();
+</script>
+</body>
+</html>

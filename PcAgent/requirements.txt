@@ -1,0 +1,8 @@
+psutil
+# 再生中の曲の表示（なくても他の機能は動きます）
+winrt-Windows.Media.Control
+winrt-Windows.Foundation
+winrt-Windows.Foundation.Collections
+# 音量の数値表示（なくても音量ボタンは動きます）
+pycaw
+comtypes
